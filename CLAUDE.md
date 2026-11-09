@@ -4,7 +4,7 @@ Context for Claude Code in this repo. Project overview: @README.md
 
 ## Who and what
 
-Sigshell is a natural-language shell for biologists over the sigscores R package. It's a Software Engineering course project by Enrico (Python side) and Marco (R side), due Fri 27 Nov 2026.
+Sigshell is a natural-language shell for biologists over the sigscores R package. It's a Software Engineering course project by Enrico Adamo (Python side) and Marco Riva (R side).
 
 ## Current phase: understanding the library
 
