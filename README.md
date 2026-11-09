@@ -1,7 +1,7 @@
 # Sigshell
 
 A natural-language shell for biologists over the [sigscores](https://github.com/alebarberis/sigscores) R package.
-Software Engineering course project by Enrico and Marco. Submission: Fri 27 Nov 2026.
+Software Engineering course project by Enrico Adamo and Marco Riva.
 
 ## The library we wrap
 
