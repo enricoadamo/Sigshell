@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sigshell": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "sigshell-server"
+      ],
+      "env": {}
+    }
+  }
+}

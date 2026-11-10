@@ -6,9 +6,11 @@ Context for Claude Code in this repo. Project overview: @README.md
 
 Sigshell is a natural-language shell for biologists over the sigscores R package. It's a Software Engineering course project by Enrico Adamo (Python side) and Marco Riva (R side).
 
-## Current phase: understanding the library
+## Current phase: the user interface
 
-Session 1 started Mon 9 Nov 2026. The wrapper's design is **not decided yet**: don't propose an architecture or write wrapper code unless asked.
+- Phase 1 (verifying sigscores) and Phase 2 (the MCP server in `src/sigshell/`) are done. `DESIGN.md` records both.
+- Phase 3 is the interface. On 10 Nov Enrico asked for a local web page first (option C in `DESIGN.md` section 7). The other decisions in section 9 are still open: don't act on them without asking.
+- The design is in `DESIGN.md`. Read it before changing the server, and keep it up to date when the design changes.
 
 ## The library
 
@@ -44,6 +46,8 @@ We want to understand the library ourselves, not be handed a summary.
 ## Working rules
 
 - Don't create files (notes, docs, scripts) unless asked. Keep the repo minimal.
+- Every number Sigshell shows must come from sigscores, run by R. Each guard in `server.py` comes from a confirmed finding in `findings/`. Don't add a guard without a finding, and don't remove one without checking the finding again.
+- Run the tests with `uv run --group dev pytest -q`.
 - Don't commit, push or create branches unless asked. Branches are `enrico/<topic>` or `marco/<topic>`; `main` must always work; the other person reviews each pull request.
 - Run R with `Rscript -e '...'`, or ask us to run it in RStudio. Check `R --version` and `packageVersion("sigscores")` instead of assuming them.
 - sigscores is installed from the pinned source with `R CMD INSTALL ../sigscores`.
