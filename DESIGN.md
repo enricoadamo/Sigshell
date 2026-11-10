@@ -4,7 +4,7 @@ Sigshell lets a biologist who doesn't program use the sigscores R package by ask
 
 This document records what Phase 1 established about the library, then proposes the tools, the server and the user interface. Line references are to sigscores at commit `40f55c5` (`../sigscores`).
 
-Status, 2026-11-10: Phases 1 and 2 are done. The server in `src/sigshell/` implements sections 5 and 6. The interface (section 7) waits for a decision.
+Status, 2026-11-10: Phases 1 and 2 are done. The server in `src/sigshell/` implements sections 5 and 6. Phase 3 has started: option C of section 7, the local web page, is in `src/sigshell/web.py`. The other interface options wait for decision 1 in section 9.
 
 ## 1. What Phase 1 verified
 
@@ -155,6 +155,22 @@ Guards, each from a confirmed finding. Every guard reports the problem; none fix
 - B costs little and is needed anyway for headless experiments, so it ships as a power-user command.
 - A is deferred until D works. It is the only option that needs work we can't yet prove (file input from the sandbox).
 
+### 7.1 Option C as built
+
+`uv run sigshell-ui` serves the page at `http://127.0.0.1:8787` (or any free port) and opens the browser. The code is in `src/sigshell/web.py` and `src/sigshell/web/`.
+
+- **Same tools as the MCP server.** Every analysis goes through `server.call_tool`, the entry point an MCP client uses. The page therefore gets the same argument validation, guards (section 5), step scripts, session folder and provenance. `web.py` computes no numbers. It moves files and passes a fixed list of arguments per tool.
+- **Steps on the page:**
+  1. Data: drop a file or pick one from the data folder.
+  2. Check: `check_inputs`, with `prepare_matrix` offered for constant or NA genes, and the `drop_missing_genes` choice.
+  3. Scores, grouped as level, spread and GSVA-based. The GSVA group is disabled with the reason when the guard would refuse it. Then the table, the CSV and the four plots.
+  4. Significance: null model, number of random scores, seed and alternative. A table with a histogram per row.
+  5. Reproduce: `session.R`, and the whole session as a zip.
+- **Uploads** go into the data folder (`~/Sigshell/data`), so a later Claude session sees the same files. Names are reduced to `[A-Za-z0-9._-]`. Only `.csv`, `.tsv` and `.txt` are accepted. A different file with the same name is kept: the new one gets a `-2` suffix.
+- **Example data:** `r/vignette_example.R` runs the vignette's own `set.seed(5381)` and data chunks, so the page's example gives the published scores. `tests/web` checks S1 and S2 against `tests/b_vignette`.
+- **Reachable only from this computer:** the page listens on 127.0.0.1 only. Any other `Host` header is refused, which blocks DNS rebinding. POST requests need an `X-Sigshell` header that another site can't send without a CORS preflight, and the server never answers preflights. Session files are served only from inside the session folder.
+- **No external libraries:** plain HTML, CSS and JavaScript, so the page works offline. Light and dark follow the system setting. Checked at 1280 px and 390 px in headless Chrome.
+
 ## 8. Verification and experiments (outline)
 
 Tests sit in `tests/`, grouped as the brief asks:
@@ -170,7 +186,7 @@ Experiments 1 to 5 get a preregistration file committed before any run. Experime
 
 ## 9. Decisions needed from Enrico
 
-1. **Interface:** D plus C as recommended in section 7, or another choice.
+1. **Interface:** on 2026-11-10 Enrico asked for a website first, so C is built (section 7.1). Still open: D plus C as recommended in section 7, or another choice.
 2. **Significance default:** `alternative = "greater"` in `test_significance` instead of sigscores' two-sided default.
 3. **GSVA guard:** refuse the four GSVA-based scores when the matrix has constant or NA genes, until the user runs `prepare_matrix`.
 4. **Claude Desktop registration:** may I add Sigshell to `~/Library/Application Support/Claude/claude_desktop_config.json` and restart Claude Desktop to measure which MCP revision it speaks? Until then, only MCP Inspector is used.

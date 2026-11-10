@@ -28,13 +28,14 @@ sigscores is GPL-3. This repo stays private until we choose sigshell's own licen
 
 ## Status
 
-The MCP server is in `src/sigshell/` (Phases 1 and 2 of `DESIGN.md`). The setup guide for biologists comes with the user interface.
+The MCP server is in `src/sigshell/` (Phases 1 and 2 of `DESIGN.md`). The first user interface is a web page that runs on your own computer (`src/sigshell/web.py`). `uv run sigshell-ui` opens it in the browser. It runs the same tools as the MCP server and works without AI. The setup guide for biologists is still to be written.
 
 For developers, with R, sigscores (installed from `../sigscores` at commit `40f55c5`) and uv:
 
 ```sh
 uv sync
 uv run sigshell-server          # MCP server on stdio
+uv run sigshell-ui              # web page on http://127.0.0.1:8787 (--port, --no-browser)
 uv run --group dev pytest -q    # tests
 npx @modelcontextprotocol/inspector --cli uv run sigshell-server --method tools/list
 ```

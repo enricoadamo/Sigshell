@@ -9,7 +9,7 @@ Sigshell is a natural-language shell for biologists over the sigscores R package
 ## Current phase: the user interface
 
 - Phase 1 (verifying sigscores) and Phase 2 (the MCP server in `src/sigshell/`) are done. `DESIGN.md` records both.
-- Phase 3 is the interface. On 10 Nov Enrico asked for a local web page first (option C in `DESIGN.md` section 7). The other decisions in section 9 are still open: don't act on them without asking.
+- Phase 3 is the interface. On 10 Nov Enrico asked for a local web page first (option C in `DESIGN.md` section 7). The page is `src/sigshell/web.py`, started with `uv run sigshell-ui`. It runs the MCP tools through `server.call_tool`, so put new behaviour in the tools, not in the page. The other decisions in `DESIGN.md` section 9 are still open: don't act on them without asking.
 - The design is in `DESIGN.md`. Read it before changing the server, and keep it up to date when the design changes.
 
 ## The library

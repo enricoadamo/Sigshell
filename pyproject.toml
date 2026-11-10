@@ -5,10 +5,11 @@ description = "A natural-language shell for the sigscores R package, served over
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Enrico Adamo" }, { name = "Marco Riva" }]
-dependencies = ["mcp==2.3.0"]
+dependencies = ["mcp==2.3.0", "starlette", "uvicorn", "python-multipart"]
 
 [project.scripts]
 sigshell-server = "sigshell.server:main"
+sigshell-ui = "sigshell.web:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6"]

@@ -41,6 +41,11 @@ class Session:
         self._staged: dict[str, str] = {}
 
     @property
+    def started(self) -> Path | None:
+        """The session folder, or None if nothing has run yet (reading `dir` would create it)."""
+        return self._dir
+
+    @property
     def dir(self) -> Path:
         if self._dir is None:
             base = self._root or config.SESSIONS_DIR
