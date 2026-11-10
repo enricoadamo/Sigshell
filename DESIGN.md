@@ -4,6 +4,8 @@ Sigshell lets a biologist who doesn't program use the sigscores R package by ask
 
 This document records what Phase 1 established about the library, then proposes the tools, the server and the user interface. Line references are to sigscores at commit `40f55c5` (`../sigscores`).
 
+Status, 2026-11-10: Phases 1 and 2 are done. The server in `src/sigshell/` implements sections 5 and 6. The interface (section 7) waits for a decision.
+
 ## 1. What Phase 1 verified
 
 Environment, checked on 2026-11-10: macOS 26.6.2 on arm64, R 4.4.1, sigscores 0.1.0 installed from `../sigscores`, GSVA 2.0.7, matrixStats 1.5.0, ggplot2 3.5.1, ComplexHeatmap 2.22.0, uv 0.11.11, Node 26.10.0, Claude Code 2.1.280, Claude Desktop 4.23118.1.
@@ -76,12 +78,13 @@ Where the paper and code agree, Sigshell follows the code: the z-score delegates
 
 ## 4. Findings
 
-`findings/reproduce.R` holds 38 findings, each with a minimal reproduction:
+`findings/findings.json` holds 41 findings; `findings/FINDINGS.md` lists them, and `findings/reproduce.R <id>` reproduces each one. All 41 were confirmed on 2026-11-10:
 
-- the 36 from the call map, all confirmed;
-- 2 new ones: `resampling-null` and `mode-is-min`.
+- the 36 from the call map;
+- 2 found in Phase 1: `resampling-null` and `mode-is-min`;
+- 3 found while building the server: `dup-signature-gene` (a gene listed twice is scored twice, `R/5-scorers.R:1174`), `dup-matrix-gene` (only the first of two same-named rows is used) and `quantile-na-rows` (quantile normalisation drops NA rows, so scorers index the wrong rows, `R/4-data-preprocessing.R:230`).
 
-Phase 2 adds `findings/FINDINGS.md` and draft upstream issues for the bugs.
+`findings/upstream/` holds 10 draft issues covering the 27 findings that need a change upstream, each with a reproduction that was run in a fresh R process. None has been filed.
 
 ## 5. Tools
 
@@ -111,10 +114,15 @@ Guards, each from a confirmed finding. Every guard reports the problem; none fix
 - **Transformations with `trimmedMean` or `aad`** (`transform-order`): the result says those two transform after subsetting.
 - **Two-sided ASL** (`asl-abs`): the tool's default `alternative` is `"greater"` ("is the signature higher than random sets?"), always stated in the result. `"two.sided"` stays available, with its caveat.
 - **Unknown or misspelled score ids** (`typo-score`): rejected by the tool before R runs.
+- **Duplicated genes** (`dup-signature-gene`, `dup-matrix-gene`): a gene listed twice in the signature, or two matrix rows with the same name, is an error in `check_inputs`.
+- **Quantile normalisation with NA genes** (`quantile-na-rows`): refused until `prepare_matrix` removes them.
+- **Z-standardisation by columns, or robust** (`z-cols`, `z-robust`): not offered; only `by = "rows"` with `robust = FALSE` is.
+- **Hexadecimal cells:** R reads `0x1A` as 26; the validator treats anything but a decimal number, `NA` or an empty cell as an error.
 
 ## 6. Server
 
-- **Language and SDK:** Python 3.13 via uv, `mcp` 2.3.0 pinned, `MCPServer` with the stdio transport. That SDK's newest revision is `2026-07-28`, the current revision of the spec. It also answers handshake-based clients; its fallback is `2025-03-26`. Which revision Claude Desktop actually uses is measured once the server is registered there, and MCP Inspector 2.14.0 is used to test both.
+- **Language and SDK:** Python 3.13 via uv, `mcp` 2.3.0 pinned, `MCPServer` with the stdio transport. That SDK's newest revision is `2026-07-28`, the current revision of the spec.
+- **Measured with MCP Inspector 2.14.0** (CLI, 2026-11-10): with `--protocol-era legacy` the server negotiates `2025-11-25` through the initialisation handshake; with `modern` and `auto` it answers `2026-07-28`. `tools/list --strict` reports no schema portability problems; `tools/call` and `resources/read` work in the modern era. Inspector asks for Node ≥ 26.12.1 and ran with a warning on Node 26.10.0. Which revision Claude Desktop 4.23118.1 uses can only be read from its logs once Sigshell is registered there (decision 4).
 - **R bridge:** each tool call writes a self-contained R script to the session folder and runs it with `Rscript --vanilla` in a fresh process. Loading sigscores takes about 0.1 s because GSVA loads only when used. The script writes its result as JSON with full precision (`jsonlite`, `digits = NA`), plus CSV and PNG files. A fresh process per call isolates the `sink` and parallel side effects and makes every step replayable.
 - **Session folder:** `~/Sigshell/sessions/<YYYYMMDD-HHMMSS>/` with:
   - `calls.jsonl`: tool, arguments, time, duration, status;

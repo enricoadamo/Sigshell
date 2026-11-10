@@ -25,3 +25,18 @@ We never edit sigscores itself. If we find a bug, we report it upstream.
 ## Licence
 
 sigscores is GPL-3. This repo stays private until we choose sigshell's own licence.
+
+## Status
+
+The MCP server is in `src/sigshell/` (Phases 1 and 2 of `DESIGN.md`). The setup guide for biologists comes with the user interface.
+
+For developers, with R, sigscores (installed from `../sigscores` at commit `40f55c5`) and uv:
+
+```sh
+uv sync
+uv run sigshell-server          # MCP server on stdio
+uv run --group dev pytest -q    # tests
+npx @modelcontextprotocol/inspector --cli uv run sigshell-server --method tools/list
+```
+
+Inputs go in `~/Sigshell/data`; each session is written to `~/Sigshell/sessions/<time>/` with a `session.R` that replays it without AI. Known issues in sigscores are in `findings/FINDINGS.md`.
