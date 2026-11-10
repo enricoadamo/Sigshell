@@ -268,6 +268,23 @@ def _provenance_line(inst: rbridge.Installation, step: str) -> str:
 
 # ---------------------------------------------------------------- tools
 
+def data_files(base: Path) -> list[dict[str, Any]]:
+    """The .csv/.tsv/.txt files under base (up to 3 levels deep), each with a guess at what it holds."""
+    files = sorted(p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in (".csv", ".tsv", ".txt") and len(p.relative_to(base).parts) <= 3)
+    out = []
+    for p in files:
+        try:
+            with p.open(encoding="utf-8-sig", errors="replace") as fh:
+                first = fh.readline()
+        except OSError:
+            first = ""
+        sep = "," if p.suffix.lower() == ".csv" else "\t"
+        n = len(first.split(sep))
+        out.append({"name": str(p.relative_to(base)), "kb": round(p.stat().st_size / 1024, 1),
+                    "kind": "matrix" if n > 2 else "signature", "sample_columns": n - 1 if n > 2 else None})
+    return out
+
+
 @server.tool(title="Find data files")
 @logged
 async def find_data_files(folder: Annotated[str | None, Field(description="Folder to list. Defaults to the Sigshell data folder, ~/Sigshell/data.")] = None) -> str:
@@ -277,19 +294,13 @@ async def find_data_files(folder: Annotated[str | None, Field(description="Folde
         base.mkdir(parents=True, exist_ok=True)
     if not base.is_dir():
         raise ToolError(f"{base} is not a folder.")
-    files = sorted(p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in (".csv", ".tsv", ".txt") and len(p.relative_to(base).parts) <= 3)
+    files = data_files(base)
     if not files:
         return f"No .csv, .tsv or .txt files in {base}. Ask the user to put their expression matrix and signature there."
     lines = [f"Files in {base}:"]
-    for p in files:
-        try:
-            first = p.open(encoding="utf-8-sig", errors="replace").readline()
-        except OSError:
-            first = ""
-        sep = "," if p.suffix.lower() == ".csv" else "\t"
-        n = len(first.split(sep))
-        kind = f"looks like a matrix ({n - 1} sample columns)" if n > 2 else "looks like a gene list"
-        lines.append(f"- {p.relative_to(base)} ({p.stat().st_size / 1024:.1f} KB): {kind}")
+    for f in files:
+        kind = f"looks like a matrix ({f['sample_columns']} sample columns)" if f["kind"] == "matrix" else "looks like a gene list"
+        lines.append(f"- {f['name']} ({f['kb']:.1f} KB): {kind}")
     return "\n".join(lines)
 
 
@@ -305,6 +316,9 @@ async def check_inputs(matrix_file: Path_, signature_file: Annotated[str | None,
         "samples": report.matrix.samples if report.matrix else None,
         "signature_found": report.found,
         "signature_missing": report.missing,
+        "signature_has_weights": bool(report.signature and report.signature.weights),
+        "constant_genes": report.constant_genes,
+        "genes_with_na": report.genes_with_na,
         "ready": not report.errors,
     }
     return _result(validate.summary(report), structured)
@@ -414,7 +428,8 @@ sigshell_save_result("{step}", list(scores = scores, warnings = run$warnings, me
         "\n" + _provenance_line(inst, step),
     ])
     structured = {"result_id": rid, "samples": samples, "scores": {s: table[s] for s in scores}, "notes": notes,
-                  "provenance": {"commit": inst.commit, **inst.versions}, "session": str(session.dir), "step": step}
+                  "n_genes_scored": res["n_genes_scored"], "provenance": {"commit": inst.commit, **inst.versions},
+                  "provenance_line": inst.line, "session": str(session.dir), "step": step}
     return _result(text, structured, step)
 
 
@@ -505,7 +520,9 @@ sigshell_save_result("{step}", list(significance = significance, observed = obse
         "\nNotes:\n" + "\n".join(f"- {x}" for x in notes),
         "\n" + _provenance_line(inst, step),
     ])
-    structured = {"result_id": rid, "significance": sig, "notes": notes, "provenance": {"commit": inst.commit, **inst.versions},
+    structured = {"result_id": rid, "significance": sig, "notes": notes, "n_genes_scored": res["n_genes_scored"],
+                  "null": null, "n_repeat": n_repeat, "seed": seed, "alternative": alternative,
+                  "provenance": {"commit": inst.commit, **inst.versions}, "provenance_line": inst.line,
                   "session": str(session.dir), "step": step}
     return _result(text, structured, step)
 

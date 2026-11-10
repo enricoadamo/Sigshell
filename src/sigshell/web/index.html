@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sigshell</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <div class="brand">
+        <img src="/static/icon.svg" alt="" width="32" height="32">
+        <div>
+          <h1>Sigshell</h1>
+          <p>Gene signature scores with the sigscores R package</p>
+        </div>
+      </div>
+      <nav class="top-links">
+        <a id="link-callmap" href="/callmap" target="_blank" rel="noopener" hidden>Functions &amp; known issues</a>
+        <a id="link-paper" href="/paper" target="_blank" rel="noopener" hidden>Paper</a>
+        <button id="new-session" class="ghost small" type="button">New session</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="status" class="status" role="status">Checking R and sigscores…</div>
+  </div>
+
+  <main class="wrap">
+    <section id="s-data" class="card">
+      <h2><span class="n">1</span>Your data</h2>
+      <p class="lede">Choose an expression matrix and a gene signature. You can drop new files here, or pick files already in the Sigshell data folder.</p>
+      <div class="pickers">
+        <div class="picker" data-role="matrix">
+          <h3>Expression matrix</h3>
+          <p class="hint">Genes in rows, samples in columns. First row: sample names. First column: gene IDs. A .csv file, or tab-separated .tsv or .txt.</p>
+          <label class="drop">
+            <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values">
+            <span class="drop-text">Drop a file here or <u>browse</u></span>
+          </label>
+          <select aria-label="Matrix file in the data folder"></select>
+          <div class="chosen" aria-live="polite"></div>
+        </div>
+        <div class="picker" data-role="signature">
+          <h3>Gene signature</h3>
+          <p class="hint">One gene ID per line, spelled as in the matrix. An optional weight can follow each gene after a tab or comma.</p>
+          <label class="drop">
+            <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values">
+            <span class="drop-text">Drop a file here or <u>browse</u></span>
+          </label>
+          <select aria-label="Signature file in the data folder"></select>
+          <div class="chosen" aria-live="polite"></div>
+        </div>
+      </div>
+      <p class="foot-note">Files you add are copied into <code id="data-dir">the data folder</code>. Your originals are never changed.
+        <button id="example" class="link" type="button">Try the example from the sigscores vignette</button></p>
+      <div id="data-msg"></div>
+    </section>
+
+    <section id="s-check" class="card" hidden>
+      <h2><span class="n">2</span>Check</h2>
+      <div id="check-out"></div>
+    </section>
+
+    <section id="s-scores" class="card" hidden>
+      <h2><span class="n">3</span>Scores</h2>
+      <p class="lede">Each score summarises the signature genes into one number per sample. Pick the ones you want.</p>
+      <div class="quick">
+        <button type="button" class="ghost small" data-pick="level">All level scores</button>
+        <button type="button" class="ghost small" data-pick="all">All available</button>
+        <button type="button" class="ghost small" data-pick="none">Clear</button>
+      </div>
+      <div id="score-groups"></div>
+      <details class="options">
+        <summary>Options</summary>
+        <div class="option-grid">
+          <label>Transform the data first
+            <select id="opt-transform"></select>
+          </label>
+          <p id="opt-transform-help" class="hint"></p>
+          <label id="opt-trim-row" hidden>Fraction trimmed from each end by trimmedMean
+            <input id="opt-trim" type="number" min="0" max="0.49" step="0.05" value="0">
+          </label>
+          <label class="check"><input id="opt-narm" type="checkbox" checked> Ignore missing values (sigscores' default)</label>
+        </div>
+      </details>
+      <div class="actions">
+        <button id="run-scores" class="primary" type="button" disabled>Compute scores</button>
+        <span id="scores-hint" class="hint">Choose at least one score.</span>
+      </div>
+      <div id="scores-out"></div>
+    </section>
+
+    <section id="s-sig" class="card" hidden>
+      <h2><span class="n">4</span>Significance</h2>
+      <p class="lede">Is each sample's score higher than the scores of random gene sets of the same size? This uses the scores and options chosen above.</p>
+      <div class="option-grid two">
+        <fieldset>
+          <legend>Random gene sets</legend>
+          <div id="sig-nulls"></div>
+          <p id="sig-not-offered" class="hint"></p>
+        </fieldset>
+        <div class="stack">
+          <label>Number of random scores per sample
+            <input id="sig-n" type="number" min="10" max="100000" step="100" value="1000">
+          </label>
+          <label>Random seed, so the result can be repeated
+            <input id="sig-seed" type="number" step="1" value="1">
+          </label>
+          <label>Question
+            <select id="sig-alt">
+              <option value="greater">Is the observed score higher than random? (one-sided)</option>
+              <option value="less">Is the observed score lower than random? (one-sided)</option>
+              <option value="two.sided">Is it different, in absolute value? (two-sided)</option>
+            </select>
+          </label>
+          <label>Confidence level for the intervals
+            <input id="sig-conf" type="number" min="0.51" max="0.999" step="0.01" value="0.95">
+          </label>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="run-sig" class="primary" type="button">Test significance</button>
+        <span id="sig-hint" class="hint"></span>
+      </div>
+      <div id="sig-out"></div>
+    </section>
+
+    <section id="s-script" class="card" hidden>
+      <h2><span class="n">5</span>Reproduce</h2>
+      <p class="lede">Every step above was run as a plain R script. <code>session.R</code> repeats the whole session in R, without Sigshell and without AI.</p>
+      <p id="session-path" class="foot-note"></p>
+      <div class="actions">
+        <button id="show-script" class="ghost" type="button">Show the R script</button>
+        <a id="dl-script" class="button ghost" href="/files/session.R" download="session.R">Download session.R</a>
+        <a id="dl-zip" class="button ghost" href="/session.zip">Download the session (.zip)</a>
+      </div>
+      <pre id="script-out" class="code" hidden></pre>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p id="citation"></p>
+    <p>Sigshell runs sigscores on this computer. Your data does not leave it.</p>
+  </footer>
+</body>
+</html>
