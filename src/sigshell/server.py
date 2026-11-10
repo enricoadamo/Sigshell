@@ -129,7 +129,7 @@ def _validated(matrix_file: str, signature_file: str, drop_missing_genes: bool) 
 def _check_scores(scores: list[str], inst: rbridge.Installation) -> None:
     known = inst.ids("scores")
     if not scores:
-        raise ToolError("Choose at least one score. list_methods describes the 18 available.")
+        raise ToolError(f"Choose at least one score. list_methods describes the {len(known)} that sigscores offers.")
     unknown = [s for s in scores if s not in known]
     if unknown:
         raise ToolError(f"Unknown score ids: {', '.join(unknown)}. sigscores knows: {', '.join(known)}. (sigscores itself would drop unknown ids silently; finding typo-score.)")
@@ -313,7 +313,7 @@ async def check_inputs(matrix_file: Path_, signature_file: Annotated[str | None,
 @server.tool(title="List methods")
 @logged
 async def list_methods() -> str:
-    """Describe the 18 scores, 3 data transformations and the null models for significance, with known caveats."""
+    """Describe every score and data transformation the installed sigscores offers, and the null models for significance, with known caveats."""
     inst = await _provenance()
     out = ["Scores (ids for the `scores` argument):"]
     for row in inst.methods["scores"]:
