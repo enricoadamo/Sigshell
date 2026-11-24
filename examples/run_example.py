@@ -49,8 +49,9 @@ async def run(out: Path) -> Path:
 
     env = {"SIGSHELL_HOME": str(out), "SIGSHELL_DATA": str(data), "SIGSHELL_SESSIONS": str(sessions),
            "SIGSCORES_SRC": str(config.SIGSCORES_SRC)}
-    if os.environ.get("SIGSHELL_RSCRIPT"):
-        env["SIGSHELL_RSCRIPT"] = os.environ["SIGSHELL_RSCRIPT"]
+    # MCP clients start servers with only HOME, LOGNAME, PATH, SHELL, TERM and USER. R packages in a
+    # library that only R_LIBS or R_LIBS_USER points to (as on CI) would then be invisible to the server.
+    env |= {k: v for k, v in os.environ.items() if k in ("SIGSHELL_RSCRIPT", "R_LIBS", "R_LIBS_USER", "R_LIBS_SITE")}
     params = StdioServerParameters(command=sys.executable, args=["-m", "sigshell.server"], env=env, cwd=str(config.REPO_ROOT))
 
     log = ["# Sigshell over MCP: the sigscores vignette example", "",
