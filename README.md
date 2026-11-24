@@ -81,6 +81,8 @@ The MCP server runs on stdio, so any MCP client can start it.
                                "args": ["--directory", "/full/path/to/Sigshell", "run", "sigshell-server"]}}}
   ```
 
+MCP clients start the server with a minimal environment (`HOME`, `PATH`, `USER` and a few more). If your R packages live in a library that only `R_LIBS_USER` or `R_LIBS` points to, add it to the entry: `"env": {"R_LIBS_USER": "/path/to/library"}`. Sigshell looks for `Rscript` in the usual install locations itself.
+
 Put your files in `~/Sigshell/data` and ask, for example: *"Check vignette-matrix.csv and vignette-signature.txt, then give me the mean and median score per sample."* The server tells Claude to check inputs first and to report only numbers that came from a tool. `examples/run_example.py` drives the same server with a fixed list of calls instead of a model; `examples/vignette-session/transcript.md` shows what a client receives.
 
 ## Rerun a session without Sigshell
