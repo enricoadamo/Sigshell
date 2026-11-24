@@ -1,8 +1,10 @@
 [project]
 name = "sigshell"
-version = "0.1.0"
+version = "1.0.0"
 description = "A natural-language shell for the sigscores R package, served over MCP"
 readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Enrico Adamo" }, { name = "Marco Riva" }]
 dependencies = ["mcp==2.3.0", "starlette", "uvicorn", "python-multipart"]
