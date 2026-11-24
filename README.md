@@ -41,3 +41,12 @@ npx @modelcontextprotocol/inspector --cli uv run sigshell-server --method tools/
 ```
 
 Inputs go in `~/Sigshell/data`; each session is written to `~/Sigshell/sessions/<time>/` with a `session.R` that replays it without AI. Known issues in sigscores are in `findings/FINDINGS.md`.
+
+## Use the local workbench
+
+1. Open `sigshell-ui` and upload a matrix (`.csv`, `.tsv`, or `.txt`) with gene IDs in the first column and samples in the remaining columns. Upload a signature with one gene ID per line and optional numeric weights in a second column.
+2. Declare the matrix's expression scale. This label is recorded, not used to normalize or transform the data. Normalize raw counts before interpreting differences across samples.
+3. Review the input report. Missing signature genes block scoring unless you explicitly choose to drop them; the choice resets when either input changes.
+4. Select scores, compute, inspect the table and plots, and download the full precision CSV. Methods have different units and ranges, so the raw heatmap colors should only be interpreted within a method.
+5. Optionally compare each observed score with random gene sets. The ASL concerns the chosen null within each sample; it is not a test of differences between sample groups.
+6. Download the session ZIP. It includes the staged inputs, outputs, `session.R`, and `provenance.json` with R and package versions. Run `Rscript session.R` from the unzipped session folder to replay it.

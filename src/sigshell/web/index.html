@@ -15,10 +15,12 @@
         <img src="/static/icon.svg" alt="" width="32" height="32">
         <div>
           <h1>Sigshell</h1>
-          <p>Gene signature scores with the sigscores R package</p>
+          <p>Signature analysis workbench</p>
         </div>
       </div>
       <nav class="top-links">
+        <a href="#s-data">Workspace</a>
+        <a href="#s-scores">Methods</a>
         <a id="link-callmap" href="/callmap" target="_blank" rel="noopener" hidden>Functions &amp; known issues</a>
         <a id="link-paper" href="/paper" target="_blank" rel="noopener" hidden>Paper</a>
         <button id="new-session" class="ghost small" type="button">New session</button>
@@ -31,6 +33,22 @@
   </div>
 
   <main class="wrap">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <span class="eyebrow">LOCAL · REPRODUCIBLE · R POWERED</span>
+        <h2 id="hero-title">From expression matrix to defensible signature scores.</h2>
+        <p>Check what is in your data, compare scoring methods, inspect the null distribution, and take every result back to R.</p>
+        <a class="button hero-action" href="#s-data">Start an analysis <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="hero-mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    </section>
+    <nav class="workflow" aria-label="Analysis steps">
+      <a href="#s-data"><span>01</span> Inputs</a>
+      <a href="#s-check"><span>02</span> Validate</a>
+      <a href="#s-scores"><span>03</span> Score</a>
+      <a href="#s-sig"><span>04</span> Test</a>
+      <a href="#s-script"><span>05</span> Reproduce</a>
+    </nav>
     <section id="s-data" class="card">
       <h2><span class="n">1</span>Your data</h2>
       <p class="lede">Choose an expression matrix and a gene signature. You can drop new files here, or pick files already in the Sigshell data folder.</p>
@@ -56,6 +74,22 @@
           <div class="chosen" aria-live="polite"></div>
         </div>
       </div>
+      <div class="context-card">
+        <div>
+          <h3>Expression scale <span class="required">Required</span></h3>
+          <p class="hint">Describe the values already in your matrix. This records context for interpretation; it does not change the numbers.</p>
+        </div>
+        <label class="scale-field">Scale and normalization
+          <select id="expression-scale" required>
+            <option value="">Choose the matrix scale…</option>
+            <option value="log_normalized">Log transformed, normalized expression</option>
+            <option value="linear_normalized">Normalized expression, linear scale</option>
+            <option value="raw_counts">Raw counts</option>
+            <option value="other">Other or unsure</option>
+          </select>
+        </label>
+        <p id="scale-help" class="hint" role="status">Choose a scale to continue. Check whether samples were normalized before interpreting differences between them.</p>
+      </div>
       <p class="foot-note">Files you add are copied into <code id="data-dir">the data folder</code>. Your originals are never changed.
         <button id="example" class="link" type="button">Try the example from the sigscores vignette</button></p>
       <div id="data-msg"></div>
@@ -70,10 +104,14 @@
       <h2><span class="n">3</span>Scores</h2>
       <p class="lede">Each score summarises the signature genes into one number per sample. Pick the ones you want.</p>
       <div class="quick">
+        <button type="button" class="ghost small" data-pick="start">Recommended start: mean + median</button>
         <button type="button" class="ghost small" data-pick="level">All level scores</button>
         <button type="button" class="ghost small" data-pick="all">All available</button>
         <button type="button" class="ghost small" data-pick="none">Clear</button>
       </div>
+      <label class="method-search">Find a method
+        <input id="method-search" type="search" placeholder="Search names, IDs, and descriptions" autocomplete="off">
+      </label>
       <div id="score-groups"></div>
       <details class="options">
         <summary>Options</summary>
@@ -97,7 +135,8 @@
 
     <section id="s-sig" class="card" hidden>
       <h2><span class="n">4</span>Significance</h2>
-      <p class="lede">Is each sample's score higher than the scores of random gene sets of the same size? This uses the scores and options chosen above.</p>
+      <p class="lede">Compare each sample's score with random gene sets of the same size. This tests signature specificity within a sample; it does not test differences between groups of samples.</p>
+      <div class="interpretation"><strong>Question answered</strong><span>Is this signature's score unusual compared with the selected random-gene null model in this sample?</span></div>
       <div class="option-grid two">
         <fieldset>
           <legend>Random gene sets</legend>

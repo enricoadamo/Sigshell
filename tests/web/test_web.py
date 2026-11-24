@@ -97,9 +97,15 @@ def test_example_matches_the_published_vignette(client):
     signature = (config.DATA_DIR / names["signature"]).read_text().split()
     assert signature[:4] == ["g12", "g41", "g23", "g59"] and len(signature) == 20  # as printed in the vignette
     r = client.post("/api/tool/compute_scores", headers=PAGE, json={
-        "matrix_file": names["matrix"], "signature_file": names["signature"], "scores": ["mean", "median"]}).json()
+        "matrix_file": names["matrix"], "signature_file": names["signature"], "scores": ["mean", "median"],
+        "expression_scale": "other"}).json()
     scores = dict(zip(r["data"]["samples"], zip(r["data"]["scores"]["mean"], r["data"]["scores"]["median"])))
     assert scores["S1"] == (666.55, 736.5) and scores["S2"] == (614, 623)  # published: S1 666.55 736.5, S2 614.00 623.0
+    assert r["data"]["expression_scale"] == "other"
+    assert "other or unsure" in r["data"]["notes"][0]
+    assert (server.session.dir / "provenance.json").exists()
+    assert "40f55c5" in (server.session.dir / "provenance.json").read_text()
+    assert "Declared expression scale: other" in (server.session.dir / "steps/001-compute_scores.R").read_text()
     assert [f["name"] for f in r["files"]] == ["001-scores.csv", "001-scores.rds"]
     plot = client.post("/api/tool/plot_scores", headers=PAGE, json={"result_id": r["data"]["result_id"], "kind": "boxplot"}).json()
     assert client.get(plot["url"]).headers["content-type"] == "image/png"

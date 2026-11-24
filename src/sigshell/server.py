@@ -22,6 +22,7 @@ Sigshell runs the sigscores R package (Barberis & Buffa 2026) for biologists who
 
 How to work:
 1. Find the user's files with find_data_files, then always run check_inputs on the matrix and signature before any analysis. Explain every problem it reports in plain language; never work around one silently.
+   Ask what scale and normalization the expression values use; pass expression_scale to analyses. Raw counts need normalization before comparing samples.
 2. Use list_methods to explain scores, transformations and null models. Prefer asking the user which scores they want over computing everything.
 3. compute_scores gives one value per sample and score; test_significance compares each value with random gene sets; plot_scores and plot_null_distribution draw figures.
 4. Every number you report must come from a Sigshell tool result. Never estimate, round differently or invent values.
@@ -184,9 +185,10 @@ def _transform_args(transform: str, options: dict[str, Any]) -> dict[str, Any]:
 
 
 def _r_inputs(step: str, matrix_rel: str, signature_rel: str, drop_missing: bool, scores: list[str], transform: str,
-              targs: dict[str, Any], trim: float, weights: bool) -> str:
+              targs: dict[str, Any], trim: float, weights: bool, expression_scale: str) -> str:
     lines = [
         f'SIGSHELL_STEP <- "{step}"',
+        f"## Declared expression scale: {expression_scale}. This label does not transform the input.",
         f"x <- sigshell_read_matrix({r_literal(matrix_rel)})",
         f"sig <- sigshell_read_signature({r_literal(signature_rel)})",
     ]
@@ -215,8 +217,15 @@ def _r_inputs(step: str, matrix_rel: str, signature_rel: str, drop_missing: bool
     return "\n".join(lines)
 
 
-def _caveats(report: validate.Report, scores: list[str], transform: str, drop_missing: bool, weights: bool) -> list[str]:
+def _caveats(report: validate.Report, scores: list[str], transform: str, drop_missing: bool, weights: bool,
+             expression_scale: str) -> list[str]:
     notes = []
+    if expression_scale == "raw_counts":
+        notes.append("Input was declared as raw counts. Library-size and composition differences can drive scores; normalize appropriately before interpreting differences between samples. Sigshell did not normalize these values.")
+    elif expression_scale == "other":
+        notes.append("Input scale was declared as other or unsure. Confirm its normalization before comparing scores across samples; Sigshell uses the matrix values as supplied unless a transform was selected.")
+    elif expression_scale == "unspecified":
+        notes.append("The expression scale or normalization was not specified. Check it before comparing scores across samples; Sigshell uses the matrix values as supplied unless a transform was selected.")
     if drop_missing and report.missing:
         notes.append(f"{len(report.missing)} signature genes were not in the matrix and were left out at your request: {', '.join(report.missing[:10])}.")
     if transform != "none" and any(s in methods.TRANSFORM_AFTER_SUBSET for s in scores):
@@ -356,6 +365,7 @@ async def prepare_matrix(
     if report.errors:
         raise ToolError("The matrix has problems that must be fixed first.\n\n" + validate.summary(report))
     inst = await _provenance()
+    session.record_environment(inst.commit, inst.versions)
     step = session.next_step()
     rel = session.stage_input(_resolve(matrix_file))
     body = "\n".join([
@@ -391,6 +401,7 @@ async def compute_scores(
     trim: Annotated[float, Field(ge=0, lt=0.5, description="Fraction trimmed from each end by trimmedMean.")] = 0.0,
     na_rm: Annotated[bool, Field(description="Ignore missing values (sigscores' default).")] = True,
     drop_missing_genes: Annotated[bool, Field(description="Score only the signature genes found in the matrix. Off by default: missing genes are an error.")] = False,
+    expression_scale: Annotated[Literal["unspecified", "log_normalized", "linear_normalized", "raw_counts", "other"], Field(description="User-declared scale of matrix values. Recorded for interpretation; does not change the values.")] = "unspecified",
 ) -> CallToolResult:
     """Compute summary scores of a gene signature for every sample (sigscores::computeSigScores, sampling = "none")."""
     inst = await _provenance()
@@ -399,9 +410,10 @@ async def compute_scores(
     targs = _transform_args(transform, transform_options)
     _guards(report, scores, transform, targs)
     weights = bool(report.signature and report.signature.weights)
+    session.record_environment(inst.commit, inst.versions)
     step = session.next_step()
     mrel, srel = session.stage_input(_resolve(matrix_file)), session.stage_input(_resolve(signature_file))
-    body = _r_inputs(step, mrel, srel, drop_missing_genes, scores, transform, targs, trim, weights) + f"""
+    body = _r_inputs(step, mrel, srel, drop_missing_genes, scores, transform, targs, trim, weights, expression_scale) + f"""
 run <- sigshell_capture(computeSigScores(x = x, i = i, scores = {r_literal(scores)}, na.rm = {r_literal(na_rm)}, args = args))
 scores <- run$value
 utils::write.csv(scores, "outputs/{step}-scores.csv", row.names = FALSE)
@@ -411,7 +423,8 @@ sigshell_save_result("{step}", list(scores = scores, warnings = run$warnings, me
   genes = rownames(x), samples = colnames(x), n_genes_scored = length(i)))
 """
     args = {"matrix_file": matrix_file, "signature_file": signature_file, "scores": scores, "transform": transform,
-            "transform_options": transform_options, "trim": trim, "na_rm": na_rm, "drop_missing_genes": drop_missing_genes}
+            "transform_options": transform_options, "trim": trim, "na_rm": na_rm, "drop_missing_genes": drop_missing_genes,
+            "expression_scale": expression_scale}
     res = await _run(step, "compute_scores", args, body)
     _check_same_table(report, res)
     table = _columns(res["scores"])
@@ -419,7 +432,7 @@ sigshell_save_result("{step}", list(scores = scores, warnings = run$warnings, me
     rows = [[samples[k]] + [table[s][k] for s in scores] for k in range(len(samples))]
     rid = f"r{step}"
     session.results[rid] = Result(rid, "scores", step, scores, samples, {"rds": f"outputs/{step}-scores.rds", "csv": f"outputs/{step}-scores.csv"})
-    notes = _r_failures(res) + _caveats(report, scores, transform, drop_missing_genes, weights)
+    notes = _r_failures(res) + _caveats(report, scores, transform, drop_missing_genes, weights, expression_scale)
     text = "\n".join([
         f"Scores for {len(samples)} samples, signature of {res['n_genes_scored']} genes (result id {rid}):\n",
         _table(["sample"] + scores, rows),
@@ -429,7 +442,7 @@ sigshell_save_result("{step}", list(scores = scores, warnings = run$warnings, me
     ])
     structured = {"result_id": rid, "samples": samples, "scores": {s: table[s] for s in scores}, "notes": notes,
                   "n_genes_scored": res["n_genes_scored"], "provenance": {"commit": inst.commit, **inst.versions},
-                  "provenance_line": inst.line, "session": str(session.dir), "step": step}
+                  "provenance_line": inst.line, "session": str(session.dir), "step": step, "expression_scale": expression_scale}
     return _result(text, structured, step)
 
 
@@ -449,6 +462,7 @@ async def test_significance(
     trim: Annotated[float, Field(ge=0, lt=0.5)] = 0.0,
     na_rm: bool = True,
     drop_missing_genes: bool = False,
+    expression_scale: Annotated[Literal["unspecified", "log_normalized", "linear_normalized", "raw_counts", "other"], Field(description="User-declared scale of matrix values. Recorded for interpretation; does not change the values.")] = "unspecified",
 ) -> CallToolResult:
     """Compare each sample's observed score with scores of random gene sets (sigscores::computeSigScores with sampling, then computeSignificance)."""
     inst = await _provenance()
@@ -457,11 +471,12 @@ async def test_significance(
     targs = _transform_args(transform, transform_options)
     _guards(report, scores, transform, targs)
     weights = bool(report.signature and report.signature.weights)
+    session.record_environment(inst.commit, inst.versions)
     sampling = {"random_genes": "rndsig", "permutation": "permutation", "bootstrap": "bootstrap"}[null]
     step = session.next_step()
     mrel, srel = session.stage_input(_resolve(matrix_file)), session.stage_input(_resolve(signature_file))
     na = r_literal(na_rm)
-    body = _r_inputs(step, mrel, srel, drop_missing_genes, scores, transform, targs, trim, weights) + f"""
+    body = _r_inputs(step, mrel, srel, drop_missing_genes, scores, transform, targs, trim, weights, expression_scale) + f"""
 obs <- sigshell_capture(computeSigScores(x = x, i = i, scores = {r_literal(scores)}, na.rm = {na}, args = args))
 set.seed({seed})
 nul <- sigshell_capture(computeSigScores(x = x, i = i, scores = {r_literal(scores)}, na.rm = {na}, args = args,
@@ -493,7 +508,8 @@ sigshell_save_result("{step}", list(significance = significance, observed = obse
 """
     args = {"matrix_file": matrix_file, "signature_file": signature_file, "scores": scores, "null": null, "n_repeat": n_repeat,
             "seed": seed, "alternative": alternative, "conf_level": conf_level, "transform": transform,
-            "transform_options": transform_options, "trim": trim, "na_rm": na_rm, "drop_missing_genes": drop_missing_genes}
+            "transform_options": transform_options, "trim": trim, "na_rm": na_rm, "drop_missing_genes": drop_missing_genes,
+            "expression_scale": expression_scale}
     res = await _run(step, "test_significance", args, body)
     _check_same_table(report, res)
     sig = _columns(res["significance"])
@@ -507,7 +523,7 @@ sigshell_save_result("{step}", list(significance = significance, observed = obse
     meaning = {"greater": f"fraction of the {n_repeat} random scores at least as high as the observed score",
                "less": f"fraction of the {n_repeat} random scores lower than the observed score",
                "two.sided": f"fraction of the {n_repeat} random scores whose absolute value is at least the observed absolute value (assumes random scores centred at 0; finding asl-abs)"}[alternative]
-    notes = _r_failures(res) + _caveats(report, scores, transform, drop_missing_genes, weights)
+    notes = _r_failures(res) + _caveats(report, scores, transform, drop_missing_genes, weights, expression_scale)
     problems = [f"{sig['sample'][k]}/{sig['score'][k]}: {sig['problems'][k]}" for k in range(n) if sig["problems"][k]]
     if problems:
         notes.append("computeSignificance could not compute some values: " + "; ".join(problems[:10]))
@@ -523,7 +539,7 @@ sigshell_save_result("{step}", list(significance = significance, observed = obse
     structured = {"result_id": rid, "significance": sig, "notes": notes, "n_genes_scored": res["n_genes_scored"],
                   "null": null, "n_repeat": n_repeat, "seed": seed, "alternative": alternative,
                   "provenance": {"commit": inst.commit, **inst.versions}, "provenance_line": inst.line,
-                  "session": str(session.dir), "step": step}
+                  "session": str(session.dir), "step": step, "expression_scale": expression_scale}
     return _result(text, structured, step)
 
 
@@ -586,7 +602,8 @@ async def plot_null_distribution(
     if sample not in res.samples or score not in res.scores:
         raise ToolError(f"{result_id} has samples {', '.join(res.samples[:10])} and scores {', '.join(res.scores)}.")
     step = session.next_step()
-    png = f"outputs/{step}-null-{sample}-{score}.png"
+    # Sample names are user-controlled matrix headers; never put them in a path.
+    png = f"outputs/{step}-null.png"
     body = f"""SIGSHELL_STEP <- "{step}"
 observed <- readRDS({r_literal(res.files['observed'])})
 random <- readRDS({r_literal(res.files['random'])})

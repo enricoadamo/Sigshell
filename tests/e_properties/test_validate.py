@@ -33,6 +33,8 @@ def test_clean_inputs_have_no_problems(tmp_path):
     ("g1\ng1\ng3\n", "duplicate_signature_genes"),
     ("g1\t2\ng3\n", "partial_weights"),
     ("g1\tx\ng3\t1\n", "bad_weights"),
+    ("g1\t1e309\ng3\t1\n", "bad_weights"),
+    ("g1\t1\tunused\ng3\t2\n", "signature_columns"),
     ("# only a comment\n", "signature_empty"),
 ])
 def test_signature_problems_are_errors(tmp_path, sig, code):
@@ -45,6 +47,7 @@ def test_signature_problems_are_errors(tmp_path, sig, code):
     ("gene,S1,S1\ng1,1,2\ng2,3,4\n", "duplicate_samples"),
     ("gene,S1,S2\ng1,1,abc\ng2,3,4\n", "non_numeric"),
     ("gene,S1,S2\ng1,1,Inf\ng2,3,4\n", "non_finite"),
+    ("gene,S1,S2\ng1,1,1e309\ng2,3,4\n", "non_finite"),
     ("gene,S1,S2\ng1,0x1A,2\ng2,3,4\n", "non_numeric"),
     ("S1,S2\ng1,1,2\ng2,3,4\n", "matrix_ragged"),
     ("gene,S1,S2\n,1,2\ng2,3,4\n", "empty_gene_id"),

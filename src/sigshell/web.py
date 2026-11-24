@@ -46,9 +46,9 @@ MAX_UPLOAD_BYTES = 500 * 1024 * 1024
 TOOLS: dict[str, tuple[str, ...]] = {
     "check_inputs": ("matrix_file", "signature_file"),
     "prepare_matrix": ("matrix_file", "remove_constant_genes", "remove_genes_with_missing_values"),
-    "compute_scores": ("matrix_file", "signature_file", "scores", "transform", "trim", "na_rm", "drop_missing_genes"),
+    "compute_scores": ("matrix_file", "signature_file", "scores", "transform", "trim", "na_rm", "drop_missing_genes", "expression_scale"),
     "test_significance": ("matrix_file", "signature_file", "scores", "null", "n_repeat", "seed", "alternative", "conf_level",
-                          "transform", "trim", "na_rm", "drop_missing_genes"),
+                          "transform", "trim", "na_rm", "drop_missing_genes", "expression_scale"),
     "plot_scores": ("result_id", "kind", "scores"),
     "plot_null_distribution": ("result_id", "sample", "score", "bins"),
     "get_r_script": (),
@@ -203,6 +203,8 @@ async def upload(request: Request) -> JSONResponse:
         await form.close()
     if not data.strip():
         return _error(f"{name} is empty.")
+    if len(data) > MAX_UPLOAD_BYTES:
+        return _error(f"The file is larger than {MAX_UPLOAD_BYTES // 2**20} MB.", 413)
     stored = _store(config.DATA_DIR, name, data)
     return JSONResponse({"name": stored, "renamed": stored != name})
 
