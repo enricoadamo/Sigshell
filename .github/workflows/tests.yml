@@ -36,6 +36,7 @@ jobs:
       # are pinned; R 4.4 takes Bioconductor 3.20, which has GSVA 2.0.x and ComplexHeatmap 2.22.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
+          dependencies: '"hard"'
           packages: |
             bioc::GSVA
             bioc::ComplexHeatmap
