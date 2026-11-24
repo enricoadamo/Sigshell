@@ -1,0 +1,91 @@
+# The whole test suite on a clean Ubuntu machine, with R, Bioconductor and the pinned sigscores
+# installed from scratch (DESIGN.md section 8, group f). It then runs the vignette example through
+# the MCP server, replays its session.R, and takes screenshots of the local page.
+# The example session and the screenshots are kept as the run's artifact.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Ubuntu, R 4.4.1, sigscores 40f55c5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: Sigshell
+
+      - name: Check out sigscores at the pinned commit
+        uses: actions/checkout@v5
+        with:
+          repository: alebarberis/sigscores
+          ref: 40f55c5cd1ab03153be40fa25e37723fdd64bacc
+          path: sigscores
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.4.1"
+          use-public-rspm: true
+
+      # The versions on the development Mac (DESIGN.md section 1): ggplot2 3.5.1 and matrixStats 1.5.0
+      # are pinned; R 4.4 takes Bioconductor 3.20, which has GSVA 2.0.x and ComplexHeatmap 2.22.
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            bioc::GSVA
+            bioc::ComplexHeatmap
+            any::data.table
+            any::doParallel
+            any::foreach
+            matrixStats@1.5.0
+            ggplot2@3.5.1
+            any::circlize
+            any::psych
+            any::jsonlite
+
+      - name: Install sigscores from the pinned source
+        run: R CMD INSTALL sigscores
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install Sigshell
+        working-directory: Sigshell
+        run: uv sync --group dev
+
+      - name: Check that Sigshell accepts this R installation
+        working-directory: Sigshell
+        run: |
+          uv run python -c "import asyncio; from sigshell import rbridge; print(asyncio.run(rbridge.installation()).line)"
+          Rscript --vanilla src/sigshell/r/check_install.R ../sigscores "$RUNNER_TEMP/installation.json"
+          cat "$RUNNER_TEMP/installation.json" | head -c 2000; echo
+
+      - name: Tests
+        working-directory: Sigshell
+        run: uv run --group dev pytest -q -rs --junitxml="$RUNNER_TEMP/pytest.xml"
+
+      - name: Vignette example through the MCP server, then session.R without it
+        working-directory: Sigshell
+        run: uv run python examples/run_example.py "$RUNNER_TEMP/example"
+
+      - name: Screenshots of the local page
+        working-directory: Sigshell
+        run: |
+          uv run --with playwright python -m playwright install --with-deps chromium
+          uv run --with playwright python examples/screenshots.py "$RUNNER_TEMP/screenshots"
+
+      - name: Keep the example, screenshots and versions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigshell-example
+          path: |
+            ${{ runner.temp }}/example
+            ${{ runner.temp }}/screenshots
+            ${{ runner.temp }}/installation.json
+            ${{ runner.temp }}/pytest.xml
+          if-no-files-found: warn
