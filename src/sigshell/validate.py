@@ -14,6 +14,7 @@ lines and lines starting with "#" are ignored. A first line whose first field is
 from __future__ import annotations
 
 import csv
+import math
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -123,7 +124,12 @@ def read_matrix(path: Path, report: Report) -> Matrix | None:
             if c in MISSING:
                 row.append(None)
             elif NUMBER.match(c):
-                row.append(float(c))
+                value = float(c)
+                if math.isfinite(value):
+                    row.append(value)
+                else:
+                    non_finite.append(f"{genes[gi]}/{samples[sj]}={c}")
+                    row.append(None)
             elif c.lower() in NON_FINITE:
                 non_finite.append(f"{genes[gi]}/{samples[sj]}={c}")
                 row.append(None)
@@ -179,8 +185,11 @@ def read_signature(path: Path, report: Report) -> Signature | None:
         return None
     genes = [p[0] for p in parts]
     weights = None
+    extra = [str(i + 1) for i, p in enumerate(parts) if len(p) > 2]
+    if extra:
+        report.add("error", "signature_columns", f"Signature lines may have only a gene ID and optional weight. Extra columns on entries {_examples(extra)}.")
     if all(len(p) >= 2 and p[1] != "" for p in parts):
-        bad = [f"{p[0]}={p[1]!r}" for p in parts if not NUMBER.match(p[1])]
+        bad = [f"{p[0]}={p[1]!r}" for p in parts if not NUMBER.match(p[1]) or not math.isfinite(float(p[1]))]
         if bad:
             report.add("error", "bad_weights", f"Weights must be numbers: {_examples(bad)}.")
         else:

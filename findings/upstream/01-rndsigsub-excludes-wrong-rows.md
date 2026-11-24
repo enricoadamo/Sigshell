@@ -22,7 +22,7 @@ randomSignatures(y5, i = paste0("g", 1:4), n = 2, exclude = TRUE)
 
 ## What happens
 
-Rows 19 and 20 never drawn, rows 1 and 2 eligible. With a pool of one row, an error (the sample is larger than the population).
+Rows 19 and 20 remain eligible, while rows 1 and 2 are never drawn. With a pool of one row, `sample()` treats that row number as `1:n` and can return rows outside the intended pool instead of reporting that the requested sample is too large.
 
 ## Expected
 

@@ -34,6 +34,7 @@ const state = {
   scores: null, // last compute_scores response
   sig: null, // last test_significance response
   sessionPath: null,
+  revision: 0,
 };
 
 const GROUPS = [
@@ -130,15 +131,41 @@ function provenance(line, step) {
 
 // columns: header labels; rows: arrays of values; extra(k): optional node for a last column.
 function dataTable(columns, rows, extra) {
-  const head = h("tr", {}, columns.map((c) => h("th", { scope: "col", text: c })), extra ? h("th", { scope: "col" }) : null);
-  const body = rows.map((r, k) => h("tr", {},
-    r.map((v, j) => h("td", {
-      class: v === null || v === undefined ? "na" : null,
-      title: typeof v === "number" ? String(v) : null,
-      text: j === 0 ? String(v) : fmt(v),
-    })),
-    extra ? h("td", { class: "act" }, extra(k)) : null));
-  return h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, head), h("tbody", {}, body)));
+  const search = h("input", { type: "search", placeholder: "Filter rows…", "aria-label": "Filter result rows" });
+  const count = h("span", { class: "hint" });
+  const body = h("tbody");
+  const head = h("tr");
+  let sortColumn = -1;
+  let ascending = true;
+  const draw = () => {
+    const query = search.value.trim().toLocaleLowerCase();
+    const selected = rows.map((row, index) => ({ row, index }))
+      .filter(({ row }) => !query || row.some((value) => String(value ?? "NA").toLocaleLowerCase().includes(query)));
+    if (sortColumn >= 0) selected.sort((a, b) => {
+      const x = a.row[sortColumn], y = b.row[sortColumn];
+      if (x == null) return y == null ? a.index - b.index : 1;
+      if (y == null) return -1;
+      const n = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+      return n === 0 ? a.index - b.index : (ascending ? n : -n);
+    });
+    count.textContent = `${selected.length} of ${rows.length} rows`;
+    body.replaceChildren(...selected.map(({ row, index }) => h("tr", {},
+      row.map((value, j) => h("td", {
+        class: value === null || value === undefined ? "na" : null,
+        title: typeof value === "number" ? String(value) : null,
+        text: j === 0 ? String(value) : fmt(value),
+      })), extra ? h("td", { class: "act" }, extra(index)) : null)));
+  };
+  columns.forEach((label, index) => head.append(h("th", { scope: "col" }, h("button", {
+    type: "button", class: "sort-head", text: label,
+    onclick: () => { ascending = sortColumn === index ? !ascending : true; sortColumn = index; draw(); },
+    "aria-label": `Sort by ${label}`,
+  }))));
+  if (extra) head.append(h("th", { scope: "col", text: "Inspect" }));
+  search.addEventListener("input", draw);
+  draw();
+  return h("div", { class: "table-block" }, h("div", { class: "table-tools" }, count, search),
+    h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, head), body)));
 }
 
 function figure(url, caption, files) {
@@ -193,6 +220,13 @@ function renderChosen(role) {
 
 function choose(role, input) {
   state.inputs[role] = input;
+  state.dropMissing = false;
+  state.check = null;
+  checkSeq++;
+  if (role === "matrix") {
+    $("#expression-scale").value = "";
+    updateScaleHelp();
+  }
   renderChosen(role);
   fillSelect(role);
   resetResults();
@@ -256,6 +290,9 @@ async function useExample(e) {
     renderChosen("signature");
     fillSelect("signature");
     choose("matrix", { value: r.matrix, label: r.matrix, note: "the vignette's simulated 100 genes × 10 samples, made by R with seed 5381" });
+    $("#expression-scale").value = "other";
+    updateScaleHelp();
+    updateSections();
   } catch (err) {
     msg.replaceChildren(errorBox(err));
   }
@@ -318,7 +355,9 @@ function renderCheck() {
   if (c.constant_genes.length || c.genes_with_na.length) parts.push(prepareBox(c));
 
   if (!signature) parts.push(alertBox("warn", null, h("p", { text: "Now choose a gene signature." })));
-  else if (!blockingErrors().length) {
+  else if (!blockingErrors().length && !$("#expression-scale").value) {
+    parts.push(alertBox("warn", "One more input needed", h("p", { text: "Choose the expression scale in step 1 before computing." })));
+  } else if (!blockingErrors().length) {
     parts.push(alertBox("ok", c.warnings.length || c.errors.length ? "Ready to compute" : "No problems found",
       h("p", { text: c.warnings.length ? "Read the warnings above: they say which scores are affected." : "Choose scores below." })));
   }
@@ -334,6 +373,7 @@ function prepareBox(c) {
   button.addEventListener("click", async () => {
     try {
       const original = state.inputs.matrix.label;
+      const declaredScale = $("#expression-scale").value;
       const r = await running(button, () => tool("prepare_matrix", {
         matrix_file: state.inputs.matrix.value,
         remove_constant_genes: constant.checked,
@@ -346,6 +386,8 @@ function prepareBox(c) {
         label: r.data.file.split(/[\\/]/).pop(),
         note: `a copy of ${original} without ${n} gene${n === 1 ? "" : "s"}, kept in the session folder`,
       });
+      $("#expression-scale").value = declaredScale;
+      updateScaleHelp();
     } catch (err) {
       box.append(errorBox(err));
     }
@@ -374,10 +416,36 @@ function renderScoreChoices() {
     const pick = b.dataset.pick;
     const block = gsvaBlock();
     state.chosen = new Set(pick === "none" ? [] : state.methods.scores
-      .filter((s) => (pick === "all" || s.group === pick) && !(s.group === "gsva" && block))
+      .filter((s) => (pick === "all" || (pick === "start" ? ["mean", "median"].includes(s.id) : s.group === pick)) && !(s.group === "gsva" && block))
       .map((s) => s.id));
+    resetResults();
     updateScoreChoices();
   }));
+}
+
+function filterMethods() {
+  const query = $("#method-search").value.trim().toLocaleLowerCase();
+  $$(".group").forEach((group) => {
+    let visible = 0;
+    $$(".choice", group).forEach((label) => {
+      label.hidden = !!query && !label.textContent.toLocaleLowerCase().includes(query);
+      if (!label.hidden) visible++;
+    });
+    group.hidden = visible === 0;
+  });
+}
+
+function updateScaleHelp() {
+  const scale = $("#expression-scale").value;
+  const messages = {
+    "": "Choose a scale to continue. Check whether samples were normalized before interpreting differences between them.",
+    log_normalized: "Sigshell will score the values as supplied. Record the normalization method in your study notes.",
+    linear_normalized: "Sigshell will score the values as supplied. Methods can respond differently to large values and outliers.",
+    raw_counts: "Raw counts can reflect library size and composition. Normalize before interpreting differences between samples; Sigshell does not normalize automatically.",
+    other: "Check the matrix scale and normalization before interpreting differences between samples. Sigshell will record this uncertainty.",
+  };
+  $("#scale-help").textContent = messages[scale] || messages[""];
+  $("#scale-help").classList.toggle("scale-warning", ["raw_counts", "other"].includes(scale));
 }
 
 function choiceItem(s) {
@@ -385,7 +453,7 @@ function choiceItem(s) {
     h("input", {
       type: "checkbox",
       value: s.id,
-      onchange: (e) => { if (e.target.checked) state.chosen.add(s.id); else state.chosen.delete(s.id); updateScoreChoices(); },
+      onchange: (e) => { if (e.target.checked) state.chosen.add(s.id); else state.chosen.delete(s.id); resetResults(); },
     }),
     h("span", {}, h("span", { class: "name", text: s.name }), h("span", { class: "id", text: s.id }), h("span", { class: "desc", text: s.description })));
 }
@@ -431,10 +499,11 @@ function updateScoreChoices() {
   const why = $(".group[data-group=gsva] .why");
   if (why) { why.hidden = !block; why.textContent = block || ""; }
 
-  const ready = !!(state.status && state.status.ok);
+  const ready = !!(state.status && state.status.ok && $("#expression-scale").value);
   const ids = orderedChosen();
   $("#run-scores").disabled = !ids.length || !ready;
-  $("#scores-hint").textContent = !ready ? "R is not ready: see the message at the top."
+  $("#scores-hint").textContent = !state.status?.ok ? "R is not ready: see the message at the top."
+    : !$("#expression-scale").value ? "Choose the expression scale in step 1."
     : ids.length ? `${ids.length} score${ids.length === 1 ? "" : "s"} chosen.` : "Choose at least one score.";
   $("#opt-trim-row").hidden = !state.chosen.has("trimmedMean");
 
@@ -449,22 +518,25 @@ function analysisArgs() {
     signature_file: state.inputs.signature.value,
     scores: orderedChosen(),
     transform: $("#opt-transform").value,
-    trim: state.chosen.has("trimmedMean") ? Number($("#opt-trim").value) || 0 : 0,
+    trim: state.chosen.has("trimmedMean") ? numberField("#opt-trim", "The trimmed fraction", false) : 0,
     na_rm: $("#opt-narm").checked,
     drop_missing_genes: state.dropMissing,
+    expression_scale: $("#expression-scale").value,
   };
 }
 
 async function computeScores(e) {
+  const revision = state.revision;
   try {
     const r = await running(e.currentTarget, () => tool("compute_scores", analysisArgs()));
+    if (revision !== state.revision) return;
     state.scores = r;
     state.sig = null;
     $("#sig-out").replaceChildren();
     renderScores();
     sessionStarted(r.session);
   } catch (err) {
-    $("#scores-out").replaceChildren(errorBox(err));
+    if (revision === state.revision) $("#scores-out").replaceChildren(errorBox(err));
   }
   updateScoreChoices();
   updateSections();
@@ -484,15 +556,16 @@ function renderScores() {
   $("#scores-out").replaceChildren(h("div", { class: "result" },
     h("div", { class: "result-head" },
       h("h3", { text: `Scores for ${d.samples.length} samples` }),
-      h("span", { class: "hint", text: `signature of ${d.n_genes_scored} genes · result ${d.result_id}` })),
+      h("span", { class: "hint", text: `signature of ${d.n_genes_scored} genes · ${d.expression_scale.replaceAll("_", " ")} · result ${d.result_id}` })),
     dataTable(["sample", ...ids], rows),
     downloads(r.files),
     notesBox(d.notes),
     h("div", { class: "plots" }, h("span", { class: "hint", text: "Plot:" }),
-      plotButton("heatmap", "Heatmap"),
+      plotButton("heatmap", "Heatmap (raw values)"),
       plotButton("correlation", "Correlation between scores", corrWhy),
       plotButton("boxplot", "Boxplot"),
       plotButton("scatter", "Per sample")),
+    h("p", { class: "hint plot-note", text: "Methods can have different units and ranges. The raw-value heatmap uses one color scale; compare sample patterns within a method, not colors across methods." }),
     plotArea,
     provenance(d.provenance_line, r.step)));
 }
@@ -517,13 +590,14 @@ function renderNulls() {
 
 function numberField(id, label, integer) {
   const raw = $(id).value.trim();
-  const v = integer ? Number.parseInt(raw, 10) : Number(raw);
-  if (raw === "" || !Number.isFinite(v)) throw new Error(`${label} must be a number.`);
+  const v = Number(raw);
+  if (raw === "" || !Number.isFinite(v) || (integer && !Number.isInteger(v))) throw new Error(`${label} must be ${integer ? "a whole" : "a"} number.`);
   return v;
 }
 
 async function testSignificance(e) {
   const out = $("#sig-out");
+  const revision = state.revision;
   let args;
   try {
     args = {
@@ -540,11 +614,12 @@ async function testSignificance(e) {
   }
   try {
     const r = await running(e.currentTarget, () => tool("test_significance", args));
+    if (revision !== state.revision) return;
     state.sig = r;
     renderSig();
     sessionStarted(r.session);
   } catch (err) {
-    out.replaceChildren(errorBox(err));
+    if (revision === state.revision) out.replaceChildren(errorBox(err));
   }
   updateScoreChoices();
 }
@@ -566,7 +641,7 @@ function renderSig() {
     h("div", { class: "result-head" },
       h("h3", { text: `Significance for ${new Set(s.sample).size} samples × ${new Set(s.score).size} scores` }),
       h("span", { class: "hint", text: `${NULL_LABELS[d.null] || d.null} · ${d.n_repeat} random scores per sample · seed ${d.seed} · ${d.alternative} · result ${d.result_id}` })),
-    h("p", { class: "hint", text: "ASL is the achieved significance level. The interval columns are the percentile interval of the random scores. The notes below say exactly what both mean here." }),
+    h("p", { class: "hint", text: "ASL is the achieved significance level against the chosen random-gene null. It is not a group-comparison p-value. The interval is for random scores, not uncertainty in the observed score." }),
     table,
     downloads(r.files),
     notesBox(d.notes),
@@ -634,6 +709,7 @@ async function newSession() {
 // ---------------------------------------------------------------- layout
 
 function resetResults() {
+  state.revision++;
   state.scores = null;
   state.sig = null;
   $("#scores-out").replaceChildren();
@@ -641,8 +717,14 @@ function resetResults() {
   updateSections();
 }
 
+function resetSignificance() {
+  state.revision++;
+  state.sig = null;
+  $("#sig-out").replaceChildren();
+}
+
 function updateSections() {
-  const ready = !!(state.check && state.inputs.signature && !blockingErrors().length);
+  const ready = !!(state.check && state.inputs.signature && $("#expression-scale").value && !blockingErrors().length);
   $("#s-scores").hidden = !ready || !state.methods;
   $("#s-sig").hidden = !ready || !state.methods || !state.scores;
   updateScoreChoices();
@@ -658,6 +740,10 @@ async function init() {
   $("#new-session").addEventListener("click", newSession);
   $("#opt-narm").addEventListener("change", resetResults);
   $("#opt-trim").addEventListener("change", resetResults);
+  $("#expression-scale").addEventListener("change", () => { updateScaleHelp(); resetResults(); if (state.check) renderCheck(); });
+  $("#method-search").addEventListener("input", filterMethods);
+  $$("#sig-n, #sig-seed, #sig-alt, #sig-conf").forEach((field) => field.addEventListener("change", resetSignificance));
+  $("#sig-nulls").addEventListener("change", resetSignificance);
 
   try { await refreshFiles(); } catch (err) { $("#data-msg").replaceChildren(errorBox(err)); }
   try {
