@@ -6,6 +6,11 @@ Sigshell lets a biologist use the [sigscores](https://github.com/alebarberis/sig
 
 Software Engineering course project (20875, Fall 2026) by Enrico Adamo and Marco Riva.
 
+The [course submission material](submission/README.md) collects the report,
+synthetic demonstration, presentation draft, and proposed topic update. The
+[installation guide](docs/INSTALL.md) and [workbench user guide](docs/USER_GUIDE.md)
+give more detail than the quick start below.
+
 ## What's here
 
 | Path | What it is |

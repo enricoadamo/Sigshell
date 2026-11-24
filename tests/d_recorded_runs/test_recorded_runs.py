@@ -3,7 +3,8 @@
 Each run goes through replay.R (the original harness: options(width = 72, digits = 4), set.seed(1),
 one fresh Rscript per run). Printed output, warnings, messages, errors and leftover sinks must all
 match. Run 16 prints logger timestamps, so its times are normalised before comparing.
-Skipped when R or the pinned sigscores is not available.
+Skipped when R or the pinned sigscores is not available. The parallel-only recording is
+skipped when R cannot detect at least two cores, because sigscores then runs it sequentially.
 """
 
 from __future__ import annotations
@@ -36,6 +37,15 @@ def _r_available() -> bool:
 pytestmark = pytest.mark.skipif(not _r_available(), reason="R with the pinned sigscores is not available")
 
 
+def _parallel_available() -> bool:
+    done = subprocess.run(
+        [config.find_rscript(), "--vanilla", "-e",
+         "n <- parallel::detectCores(); quit(status = if (is.na(n) || n < 2) 1 else 0)"],
+        capture_output=True, timeout=15, check=False,
+    )
+    return done.returncode == 0
+
+
 @pytest.fixture(scope="module")
 def replayed(tmp_path_factory) -> dict[int, dict]:
     out = tmp_path_factory.mktemp("replay")
@@ -56,6 +66,8 @@ def replayed(tmp_path_factory) -> dict[int, dict]:
 
 @pytest.mark.parametrize("k", range(1, len(RUNS) + 1), ids=[f"{k:03d}-{r['fn']}" for k, r in enumerate(RUNS, 1)])
 def test_run_matches_the_recording(replayed, k):
+    if k == 184 and not _parallel_available():
+        pytest.skip("R cannot detect two cores; sigscores takes its sequential path")
     rec, got = RUNS[k - 1], replayed[k]
     assert got is not None, "replay.R wrote no result"
     out, expected = got["out"], rec["out"]
