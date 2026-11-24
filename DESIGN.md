@@ -4,7 +4,7 @@ Sigshell lets a biologist who doesn't program use the sigscores R package by ask
 
 This document records what Phase 1 established about the library, then proposes the tools, the server and the user interface. Line references are to sigscores at commit `40f55c5` (`../sigscores`).
 
-Status, 2026-11-10: Phases 1 and 2 are done. The server in `src/sigshell/` implements sections 5 and 6. Phase 3 has started: option C of section 7, the local web page, is in `src/sigshell/web.py`. The other interface options wait for decision 1 in section 9.
+Status, 2026-11-24 (course submission, v1.0.0): Phases 1 and 2 are done. The server in `src/sigshell/` implements sections 5 and 6. Of section 7, option C (the local page) is built and option D needs only the Claude Desktop entry in the README, which has not yet been tried in Claude Desktop itself (decision 4); the other options and decisions in section 9 stay open. Section 8 says which tests exist and which experiments were not run.
 
 ## 1. What Phase 1 verified
 
@@ -133,8 +133,9 @@ Guards, each from a confirmed finding. Every guard reports the problem; none fix
 - **Validation** happens in Python before R runs. R then reads the file with the same rules (`read.delim`/`read.csv`, `row.names = 1`, `check.names = FALSE`) and the server checks that R saw the same dimensions and names.
 - **Resources:**
   - `sigshell://paper`: the PDF, CC BY 4.0, with its citation in the description;
+  - `sigshell://paper/citation`: the citation as text;
   - `sigshell://vignette`: `vignettes/sigscores.Rmd` from the pin;
-  - `sigshell://callmap`: the regenerated call map;
+  - `sigshell://callmap`: the call map (`callmap/index.html`);
   - `sigshell://findings`;
   - `sigshell://session/script`.
 - **Server instructions** tell Claude to run `check_inputs` first, never to state a number that didn't come from a tool, and to quote the provenance line when reporting results.
@@ -174,18 +175,19 @@ Guards, each from a confirmed finding. Every guard reports the problem; none fix
 - **Reachable only from this computer:** the page listens on 127.0.0.1 only. Any other `Host` header is refused, which blocks DNS rebinding. POST requests need an `X-Sigshell` header that another site can't send without a CORS preflight, and the server never answers preflights. Session files are served only from inside the session folder.
 - **No external libraries:** plain HTML, CSS and JavaScript, so the page works offline. Light and dark follow the system setting. Checked at 1280 px and 390 px in headless Chrome.
 
-## 8. Verification and experiments (outline)
+## 8. Verification and experiments
 
-Tests sit in `tests/`, grouped as the brief asks:
+Tests sit in `tests/`. The groups planned in Phase 1, and where each stands on 2026-11-24:
 
-- **(a)** `a_hand`: cases computed by hand from the paper's definitions.
-- **(b)** `b_vignette`: the published blocks.
-- **(c)** `c_tools_vs_r`: every tool against the same call in a separate Rscript, value for value.
-- **(d)** `d_recorded_runs`: the 184 fixtures.
-- **(e)** `e_properties`: awkward inputs, generated with Hypothesis.
-- **(f)** The same suite in GitHub Actions on Ubuntu, with R and Bioconductor installed from scratch.
+- **(a)** hand-computed cases from the paper's definitions: not written.
+- **(b)** the published vignette: `tests/web` checks that the page's example gives the published scores (S1 and S2, mean and median). The other published blocks in `tests/b_vignette/published-blocks.json` were compared once in Phase 1 (section 1) and are not yet a test.
+- **(c)** every tool against the same call in a separate Rscript: not written. `examples/run_example.py` checks a related property: `session.R`, run alone, rewrites every table of the session byte for byte.
+- **(d)** `tests/d_recorded_runs`: the 184 recorded runs, replayed with `replay.R` in fresh R processes; output, warnings, messages, errors and leftover sinks must match.
+- **(e)** `tests/e_properties`: awkward inputs for the validator. `examples/malformed_inputs.py` records what the tools do with 16 broken input sets.
+- **Findings:** `tests/findings` runs `findings/reproduce.R` for each of the 41 findings and requires CONFIRMED.
+- **(f)** `.github/workflows/tests.yml` runs the whole suite on Ubuntu 24.04 with R 4.4.1, Bioconductor 3.20 and the pinned sigscores installed from scratch, then runs the vignette example through the MCP server over stdio and takes screenshots of the page with headless Chromium.
 
-Experiments 1 to 5 get a preregistration file committed before any run. Experiment 2 compares Figure 1 B to E qualitatively, because section 3 row 8 shows the figure is not the vignette's run. Experiment 3 runs `claude -p` with a fixed model under the user's subscription; if headless runs can't be made to work, the protocol is written for manual runs.
+Experiments 1 to 5 (fidelity, Figure 1, task success with Claude, robustness, the hypoxia data) were planned with preregistration files but not run before the course deadline. The malformed-input table is descriptive and is not experiment 4.
 
 ## 9. Decisions needed from Enrico
 
