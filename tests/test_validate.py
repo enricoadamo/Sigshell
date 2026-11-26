@@ -1,4 +1,4 @@
-"""Example-based checks of the input validator; property-based checks are added in Phase 5."""
+"""Example-based checks of the input validator and R literal generation."""
 
 from pathlib import Path
 

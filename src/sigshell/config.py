@@ -17,14 +17,11 @@ HOME = Path(os.environ.get("SIGSHELL_HOME", Path.home() / "Sigshell")).expanduse
 DATA_DIR = Path(os.environ.get("SIGSHELL_DATA", HOME / "data")).expanduser()
 SESSIONS_DIR = Path(os.environ.get("SIGSHELL_SESSIONS", HOME / "sessions")).expanduser()
 
-PAPER_PDF = REPO_ROOT / "resources" / "barberis-buffa-2026-sigscores.pdf"
 PAPER_CITATION = (
     "Barberis A, Buffa FM. Sigscores: summary scores for molecular signatures in R. "
     "Bioinformatics Advances. 2026;6(1):vbag021. https://doi.org/10.1093/bioadv/vbag021. "
     "Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)."
 )
-CALLMAP_HTML = REPO_ROOT / "callmap" / "index.html"
-FINDINGS_MD = REPO_ROOT / "findings" / "FINDINGS.md"
 R_DIR = Path(__file__).resolve().parent / "r"
 
 # Seconds an R step may run before it is stopped.

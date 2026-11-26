@@ -1,4 +1,4 @@
-"""The Sigshell MCP server: tools a biologist needs, each running sigscores in a fresh R process."""
+"""Analysis operations shared by the local web page, each using a fresh R process."""
 
 from __future__ import annotations
 
@@ -17,24 +17,10 @@ from . import config, methods, rbridge, validate
 from .rbridge import RCode, r_literal
 from .session import Result, Session
 
-INSTRUCTIONS = """\
-Sigshell runs the sigscores R package (Barberis & Buffa 2026) for biologists who don't program.
-
-How to work:
-1. Find the user's files with find_data_files, then always run check_inputs on the matrix and signature before any analysis. Explain every problem it reports in plain language; never work around one silently.
-   Ask what scale and normalization the expression values use; pass expression_scale to analyses. Raw counts need normalization before comparing samples.
-2. Use list_methods to explain scores, transformations and null models. Prefer asking the user which scores they want over computing everything.
-3. compute_scores gives one value per sample and score; test_significance compares each value with random gene sets; plot_scores and plot_null_distribution draw figures.
-4. Every number you report must come from a Sigshell tool result. Never estimate, round differently or invent values.
-5. When you report results, quote the provenance line the tool returns, and mention any caveat the tool reports.
-6. get_r_script gives the plain R script that reproduces the session without AI.
-"""
-
 server = MCPServer(
     name="sigshell",
     title="Sigshell",
-    description="Gene signature scores with the sigscores R package, for biologists.",
-    instructions=INSTRUCTIONS,
+    description="Gene signature scores with the sigscores R package.",
     version="0.1.0",
 )
 session = Session()
@@ -133,7 +119,7 @@ def _check_scores(scores: list[str], inst: rbridge.Installation) -> None:
         raise ToolError(f"Choose at least one score. list_methods describes the {len(known)} that sigscores offers.")
     unknown = [s for s in scores if s not in known]
     if unknown:
-        raise ToolError(f"Unknown score ids: {', '.join(unknown)}. sigscores knows: {', '.join(known)}. (sigscores itself would drop unknown ids silently; finding typo-score.)")
+        raise ToolError(f"Unknown score ids: {', '.join(unknown)}. sigscores knows: {', '.join(known)}. sigscores itself would drop unknown ids silently.")
     if len(set(scores)) != len(scores):
         raise ToolError("Each score can be requested once.")
 
@@ -143,23 +129,23 @@ def _guards(report: validate.Report, scores: list[str], transform: str, options:
     if gsva and (report.constant_genes or report.genes_with_na):
         what = []
         if report.constant_genes:
-            what.append(f"{len(report.constant_genes)} genes with the same value in every sample (finding gsva-constant-gene)")
+            what.append(f"{len(report.constant_genes)} genes with the same value in every sample")
         if report.genes_with_na:
-            what.append(f"{len(report.genes_with_na)} genes with missing values (finding gsva-na-row)")
+            what.append(f"{len(report.genes_with_na)} genes with missing values")
         raise ToolError(
             f"The GSVA-based scores ({', '.join(gsva)}) are refused for this matrix: it has " + " and ".join(what) + ". "
             "In that case sigscores scores the wrong genes without any warning. Run prepare_matrix to write a copy without those genes, "
             "then use that file. The other scores are unaffected."
         )
     if gsva and report.matrix and len(report.matrix.samples) < 2:
-        raise ToolError("The GSVA-based scores need at least two samples; with one, sigscores returns NA (finding one-sample).")
+        raise ToolError("The GSVA-based scores need at least two samples; with one, sigscores returns NA.")
     if transform == "quantile" and report.genes_with_na:
         raise ToolError(
             "Quantile normalisation is refused for this matrix because some genes have missing values: sigscores then drops those rows "
-            "but keeps the original row numbers, so the wrong genes are scored (finding quantile-na-rows). Run prepare_matrix first."
+            "but keeps the original row numbers, so the wrong genes are scored. Run prepare_matrix first."
         )
     if transform == "z" and (options.get("by", "rows") != "rows" or options.get("robust", False)):
-        raise ToolError("Only z-standardisation by rows with robust=false is offered: by='cols' and robust=true give wrong values in sigscores (findings z-cols, z-robust).")
+        raise ToolError("Only z-standardisation by rows with robust=false is offered: by='cols' and robust=true give wrong values in sigscores.")
 
 
 TRANSFORM_OPTIONS = {
@@ -229,15 +215,15 @@ def _caveats(report: validate.Report, scores: list[str], transform: str, drop_mi
     if drop_missing and report.missing:
         notes.append(f"{len(report.missing)} signature genes were not in the matrix and were left out at your request: {', '.join(report.missing[:10])}.")
     if transform != "none" and any(s in methods.TRANSFORM_AFTER_SUBSET for s in scores):
-        notes.append("trimmedMean and aad apply the transformation after selecting the signature genes; the other scores transform the whole matrix first (finding transform-order).")
+        notes.append("trimmedMean and aad apply the transformation after selecting the signature genes; the other scores transform the whole matrix first.")
     if any(s in methods.WEIGHTED for s in scores) and not weights:
         notes.append("The signature file has no weights, so weightedSum equals sum and weightedMean equals mean.")
     if weights and not any(s in methods.WEIGHTED for s in scores):
         notes.append("The signature file has weights, but only weightedSum and weightedMean use them.")
     if "mode" in scores:
-        notes.append("mode returns the smallest value when no value repeats, which is typical for continuous data (findings modal-tie, mode-is-min).")
+        notes.append("mode returns the smallest value when no value repeats, which is typical for continuous data.")
     if "iqm" in scores and len(report.found) < 4:
-        notes.append("iqm needs at least 4 genes and is NA otherwise (finding iqm-small).")
+        notes.append("iqm needs at least 4 genes and is NA otherwise.")
     return notes
 
 
@@ -251,9 +237,9 @@ def _check_same_table(report: validate.Report, res: dict[str, Any]) -> None:
 def _r_failures(res: dict[str, Any]) -> list[str]:
     notes = []
     for s, why in (res.get("all_na") or {}).items():
-        notes.append(f"{s} is NA for every sample. sigscores hides scorer errors (finding silent-na); calling the scorer directly gives: {why}")
+        notes.append(f"{s} is NA for every sample. sigscores hides scorer errors; calling the scorer directly gives: {why}")
     if res.get("sink_left_open"):
-        notes.append("GSVA failed inside sigscores and left R's output switched off (finding gsva-sink); Sigshell switched it back on.")
+        notes.append("GSVA failed inside sigscores and left R's output switched off; Sigshell switched it back on.")
     for w in _as_list(res.get("warnings")):
         notes.append(f"R warning: {w}")
     for m in _as_list(res.get("messages")):
@@ -455,7 +441,7 @@ async def test_significance(
     null: Annotated[Literal["random_genes", "permutation", "bootstrap"], Field(description="How random scores are made; see list_methods.")] = "random_genes",
     n_repeat: Annotated[int, Field(ge=10, le=100000, description="Number of random scores per sample.")] = 1000,
     seed: Annotated[int, Field(description="Random seed, so the result can be reproduced.")] = 1,
-    alternative: Annotated[Literal["greater", "less", "two.sided"], Field(description="greater: is the observed score higher than random ones? two.sided compares absolute values (finding asl-abs).")] = "greater",
+    alternative: Annotated[Literal["greater", "less", "two.sided"], Field(description="greater: is the observed score higher than random ones? two.sided compares absolute values.")] = "greater",
     conf_level: Annotated[float, Field(gt=0.5, lt=1)] = 0.95,
     transform: Literal["none", "stepFunction", "quantile", "z"] = "none",
     transform_options: dict[str, Any] = {},  # noqa: B006
@@ -522,13 +508,13 @@ sigshell_save_result("{step}", list(significance = significance, observed = obse
         "observed": f"outputs/{step}-observed.rds", "random": f"outputs/{step}-random.rds", "csv": f"outputs/{step}-significance.csv"})
     meaning = {"greater": f"fraction of the {n_repeat} random scores at least as high as the observed score",
                "less": f"fraction of the {n_repeat} random scores lower than the observed score",
-               "two.sided": f"fraction of the {n_repeat} random scores whose absolute value is at least the observed absolute value (assumes random scores centred at 0; finding asl-abs)"}[alternative]
+               "two.sided": f"fraction of the {n_repeat} random scores whose absolute value is at least the observed absolute value (assumes random scores centred at 0)"}[alternative]
     notes = _r_failures(res) + _caveats(report, scores, transform, drop_missing_genes, weights, expression_scale)
     problems = [f"{sig['sample'][k]}/{sig['score'][k]}: {sig['problems'][k]}" for k in range(n) if sig["problems"][k]]
     if problems:
         notes.append("computeSignificance could not compute some values: " + "; ".join(problems[:10]))
     notes.append(f"asl is the {meaning}. With {n_repeat} random scores the smallest non-zero asl is {1 / n_repeat:.2g}; 0 means none of them reached the observed score.")
-    notes.append(f"The intervals come from the random scores (null model '{null}'), so they describe the null distribution, not the uncertainty of the observed score (findings resampling-null, asl-abs). Standard intervals and SE are in the CSV.")
+    notes.append(f"The intervals come from the random scores (null model '{null}'), so they describe the null distribution, not the uncertainty of the observed score. Standard intervals and SE are in the CSV.")
     text = "\n".join([
         f"Significance for {len(samples)} samples × {len(scores)} scores, null model {null} ({sampling}), {n_repeat} random scores, seed {seed}, alternative {alternative} (result id {rid}):\n",
         _table(cols, rows),
@@ -629,47 +615,3 @@ async def get_r_script() -> CallToolResult:
     msg = (f"{path} replays {len(steps)} steps. Run it with `Rscript session.R` from {session.dir}; it reads the copies of the input files in inputs/.\n\n"
            f"```r\n{text}\n```") if steps else "No analysis has run in this session yet, so the script only contains the preamble."
     return _result(msg, {"path": str(path), "steps": [p.name for p in steps]})
-
-
-# ---------------------------------------------------------------- resources
-
-@server.resource("sigshell://paper", name="paper", title="Barberis & Buffa 2026 (PDF)", mime_type="application/pdf",
-                 description="The sigscores paper. " + config.PAPER_CITATION)
-def paper() -> bytes:
-    return config.PAPER_PDF.read_bytes()
-
-
-@server.resource("sigshell://paper/citation", name="citation", title="How to cite sigscores", mime_type="text/plain")
-def citation() -> str:
-    return config.PAPER_CITATION
-
-
-@server.resource("sigshell://vignette", name="vignette", title="sigscores vignette (R Markdown)", mime_type="text/markdown",
-                 description="vignettes/sigscores.Rmd at the pinned sigscores commit.")
-def vignette() -> str:
-    return (config.SIGSCORES_SRC / "vignettes" / "sigscores.Rmd").read_text(encoding="utf-8")
-
-
-@server.resource("sigshell://callmap", name="callmap", title="sigscores call map", mime_type="text/html",
-                 description="Every sigscores function: call graph, description, arguments, source, coverage, recorded runs and findings.")
-def callmap() -> str:
-    path = config.CALLMAP_HTML if config.CALLMAP_HTML.exists() else config.REPO_ROOT.parent / "reference" / "sigscores-call-map.html"
-    return path.read_text(encoding="utf-8")
-
-
-@server.resource("sigshell://findings", name="findings", title="Known issues in sigscores", mime_type="text/markdown")
-def findings() -> str:
-    return config.FINDINGS_MD.read_text(encoding="utf-8")
-
-
-@server.resource("sigshell://session/script", name="session-script", title="R script for this session", mime_type="text/x-r")
-def session_script() -> str:
-    return session.refresh_script().read_text(encoding="utf-8")
-
-
-def main() -> None:
-    server.run("stdio")
-
-
-if __name__ == "__main__":
-    main()
