@@ -1,7 +1,7 @@
 [project]
 name = "sigshell"
 version = "1.0.0"
-description = "A natural-language shell for the sigscores R package, served over MCP"
+description = "A local web workbench for gene signature scoring with sigscores"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -10,11 +10,10 @@ authors = [{ name = "Enrico Adamo" }, { name = "Marco Riva" }]
 dependencies = ["mcp==2.3.0", "starlette", "uvicorn", "python-multipart"]
 
 [project.scripts]
-sigshell-server = "sigshell.server:main"
 sigshell-ui = "sigshell.web:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6"]
+dev = ["pytest>=8"]
 
 [build-system]
 requires = ["hatchling"]

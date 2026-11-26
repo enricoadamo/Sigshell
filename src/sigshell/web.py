@@ -1,7 +1,7 @@
-"""Sigshell's local web page: the MCP server's tools behind a form instead of a chat.
+"""Sigshell's local web page over the shared analysis tools.
 
 `sigshell-ui` serves the page at http://127.0.0.1:<port>. Every analysis goes through
-`server.call_tool`, the same entry point an MCP client uses, so the page gets the same
+`server.call_tool`, so the page gets the same
 argument validation, guards, R step scripts, session folder and provenance. This module
 computes no numbers: it only moves files and passes arguments through.
 
@@ -128,13 +128,6 @@ def _store(folder: Path, name: str, data: bytes) -> str:
         k += 1
 
 
-def _callmap_path() -> Path | None:
-    for p in (config.CALLMAP_HTML, config.REPO_ROOT.parent / "reference" / "sigscores-call-map.html"):
-        if p.exists():
-            return p
-    return None
-
-
 def _score_group(score_id: str) -> str:
     if score_id in methods.GSVA_SCORES:
         return "gsva"
@@ -154,8 +147,6 @@ async def status(request: Request) -> JSONResponse:
     out: dict[str, Any] = {
         "data_dir": str(config.DATA_DIR),
         "session": str(server.session.started) if server.session.started else None,
-        "callmap": _callmap_path() is not None,
-        "paper": config.PAPER_PDF.exists(),
         "citation": config.PAPER_CITATION,
     }
     try:
@@ -290,19 +281,6 @@ async def session_zip(request: Request) -> Response:
                     headers={"Content-Disposition": f'attachment; filename="sigshell-session-{base.name}.zip"'})
 
 
-async def callmap(request: Request) -> Response:
-    path = _callmap_path()
-    if path is None:
-        return _error("The call map is not in this copy of Sigshell.", 404)
-    return FileResponse(path, media_type="text/html")
-
-
-async def paper(request: Request) -> Response:
-    if not config.PAPER_PDF.exists():
-        return _error("The paper is not in this copy of Sigshell.", 404)
-    return FileResponse(config.PAPER_PDF, media_type="application/pdf")
-
-
 app = Starlette(
     routes=[
         Route("/", index),
@@ -315,8 +293,6 @@ app = Starlette(
         Route("/api/new-session", new_session, methods=["POST"]),
         Route("/files/{path:path}", session_file),
         Route("/session.zip", session_zip),
-        Route("/callmap", callmap),
-        Route("/paper", paper),
         Mount("/static", StaticFiles(directory=STATIC), name="static"),
     ],
     middleware=[Middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])],

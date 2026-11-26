@@ -32,7 +32,7 @@ sigshell_read_signature <- function(path) {
 }
 
 ## Run a sigscores call, keeping its warnings and messages, and detect the output
-## sink that sigscores leaves open when GSVA fails (finding gsva-sink).
+## sink that sigscores leaves open when GSVA fails.
 sigshell_capture <- function(expr) {
   w <- character(); m <- character(); n0 <- sink.number()
   value <- withCallingHandlers(expr,
@@ -44,7 +44,7 @@ sigshell_capture <- function(expr) {
 }
 
 ## A score that is NA for every sample usually means its scorer failed: sigscores
-## replaces errors with NA (finding silent-na). Call the scorer directly, the way
+## replaces errors with NA. Call the scorer directly, the way
 ## computeScores does (R/5-scorers.R:1174 and :1198), to recover the error message.
 sigshell_explain_all_na <- function(scores, x, i, na.rm, args) {
   out <- list()

@@ -185,8 +185,6 @@ function renderStatus() {
     ? `Ready. ${s.provenance}.`
     : `Sigshell can't run sigscores yet, so it can check files but not compute scores.\n${s.error}`;
   $("#data-dir").textContent = s.data_dir;
-  $("#link-callmap").hidden = !s.callmap;
-  $("#link-paper").hidden = !s.paper;
   $("#citation").textContent = `If you publish results, cite sigscores: ${s.citation.split(" Licensed")[0]}`;
 }
 

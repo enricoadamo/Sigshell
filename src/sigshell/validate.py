@@ -151,11 +151,11 @@ def read_matrix(path: Path, report: Report) -> Matrix | None:
         report.add(
             "error", "duplicate_genes",
             f"{len(dup_genes)} gene IDs appear more than once in the matrix: {_examples(dup_genes)}. "
-            "sigscores would silently use only the first row of each (finding dup-matrix-gene). Collapse or rename them first.",
+            "sigscores would silently use only the first row of each. Collapse or rename them first.",
         )
     dup_samples = [s for s, n in Counter(samples).items() if n > 1]
     if dup_samples:
-        report.add("error", "duplicate_samples", f"Sample names appear more than once: {_examples(dup_samples)}. sigscores stops on these (finding dup-samples).")
+        report.add("error", "duplicate_samples", f"Sample names appear more than once: {_examples(dup_samples)}. sigscores stops on these.")
     empty_samples = [str(j + 2) for j, s in enumerate(samples) if not s]
     if empty_samples:
         report.add("error", "empty_sample_name", f"Columns without a sample name: {_examples(empty_samples)}.")
@@ -201,7 +201,7 @@ def read_signature(path: Path, report: Report) -> Signature | None:
         report.add(
             "error", "duplicate_signature_genes",
             f"Genes listed more than once in the signature: {_examples(dups)}. "
-            "sigscores would count each copy separately, changing the score (finding dup-signature-gene). Remove the extra copies.",
+            "sigscores would count each copy separately, changing the score. Remove the extra copies.",
         )
     return Signature(path, genes, weights)
 
@@ -227,16 +227,16 @@ def check(matrix_path: str | Path, signature_path: str | Path | None = None) -> 
             report.add(
                 "warning", "missing_values",
                 f"{n_na} missing values in {len(report.genes_with_na)} genes ({_examples(report.genes_with_na)}). "
-                "Most scores skip them (na.rm = TRUE); the four GSVA-based scores are refused until those genes are removed (finding gsva-na-row).",
+                "Most scores skip them (na.rm = TRUE); the four GSVA-based scores are refused until those genes are removed.",
             )
         if report.constant_genes:
             report.add(
                 "warning", "constant_genes",
                 f"{len(report.constant_genes)} genes have the same value in every sample ({_examples(report.constant_genes)}). "
-                "The four GSVA-based scores are refused until these are removed (finding gsva-constant-gene).",
+                "The four GSVA-based scores are refused until these are removed.",
             )
         if len(m.samples) < 2:
-            report.add("warning", "single_sample", "Only one sample: the GSVA-based scores are always NA with one sample (finding one-sample).")
+            report.add("warning", "single_sample", "Only one sample: the GSVA-based scores are always NA with one sample.")
     if signature_path is None:
         return report
     s = read_signature(Path(signature_path).expanduser(), report)
@@ -272,8 +272,8 @@ def check(matrix_path: str | Path, signature_path: str | Path | None = None) -> 
             report.add(
                 "error", "missing_genes",
                 f"{len(plain)} of {len(s.genes)} signature genes are not in the matrix: {_examples(plain)}. "
-                "sigscores would score the rest without saying so (finding unknown-gene) and would draw random sets of the full size "
-                "(finding rndsig-size). Correct the signature, or rerun with drop_missing_genes=true to score only the genes found.",
+                "sigscores would score the rest without saying so and would draw random sets of the full size. "
+                "Correct the signature, or rerun with drop_missing_genes=true to score only the genes found.",
             )
     if not report.found:
         report.add("error", "no_genes_found", "None of the signature genes are in the matrix.")
@@ -281,7 +281,7 @@ def check(matrix_path: str | Path, signature_path: str | Path | None = None) -> 
 
 
 def summary(report: Report) -> str:
-    """Plain-language summary of a report, for the biologist and for Claude."""
+    """Plain-language summary of an input report."""
     out: list[str] = []
     m, s = report.matrix, report.signature
     if m is not None:

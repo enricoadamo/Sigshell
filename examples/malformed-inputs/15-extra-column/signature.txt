@@ -1,3 +1,0 @@
-VEGFA	1	vascular growth factor
-CA9	1	carbonic anhydrase
-LDHA	1	lactate dehydrogenase

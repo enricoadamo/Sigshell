@@ -1,3 +1,0 @@
-VEGFA	2
-CA9
-LDHA	1

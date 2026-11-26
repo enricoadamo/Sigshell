@@ -1,7 +1,7 @@
 """The local web page (sigshell.web): its safety checks, file handling, and one run through R.
 
-The R test compares with the published vignette (tests/b_vignette/published-blocks.json): the page's
-example data must give the vignette's scores. It is skipped when R or sigscores is not available.
+The R test checks that the page's example gives the vignette's published scores.
+It is skipped when R or sigscores is not available.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def test_upload_refuses_other_formats(client):
     assert _upload(client, "empty.csv", b"  \n").status_code == 400
 
 
-def test_check_runs_through_the_mcp_tool(client):
+def test_check_runs_through_the_analysis_layer(client):
     _upload(client, "m.csv", b",A,B\ng1,1,2\ng2,3,3\n")
     _upload(client, "s.txt", b"g1\ng9\n")
     r = client.post("/api/tool/check_inputs", headers=PAGE, json={"matrix_file": "m.csv", "signature_file": "s.txt", "ignored": 1})
