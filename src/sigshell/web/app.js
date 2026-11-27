@@ -213,7 +213,7 @@ function fillSelect(role) {
 function renderChosen(role) {
   const box = $(`.picker[data-role="${role}"] .chosen`);
   const i = state.inputs[role];
-  box.replaceChildren(...(i ? ["Using ", h("strong", { text: i.label }), i.note ? h("span", { class: "hint", text: ` (${i.note})` }) : null] : []));
+  box.replaceChildren(...(i ? ["Using ", h("strong", { text: i.label }), i.note ? h("span", { class: "hint", text: ` (${i.note})` }) : null].filter(Boolean) : []));
 }
 
 function choose(role, input) {
