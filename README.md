@@ -141,6 +141,15 @@ The example is synthetic and has no biological interpretation. Significance
 tests compare a sample's score with a chosen random-gene null; they do not
 compare clinical groups.
 
+Quantile normalisation is available for the summary methods, but is not offered
+with the four GSVA-based methods: it can create constant rows after validation
+and trigger a gene-alignment bug in the pinned package. Choose no transformation
+to use those methods. The upstream package is unchanged.
+
+Session exports retain every attempted R step and its status in `steps.json`.
+The replay script includes only successfully completed steps, so a failed
+attempt does not prevent later successful analyses from being reproduced.
+
 ## Code and checks
 
 `src/sigshell/web.py` serves the page and `src/sigshell/web/` holds its HTML,

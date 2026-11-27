@@ -126,6 +126,12 @@ def _check_scores(scores: list[str], inst: rbridge.Installation) -> None:
 
 def _guards(report: validate.Report, scores: list[str], transform: str, options: dict[str, Any]) -> None:
     gsva = [s for s in scores if s in methods.GSVA_SCORES]
+    if gsva and transform == "quantile":
+        raise ToolError(
+            "Quantile normalisation is not offered with GSVA-based scores. It can make genes constant after "
+            "the input check, causing the pinned sigscores package to score the wrong genes. "
+            "Choose No transformation for these scores, or use quantile normalisation with other methods."
+        )
     if gsva and (report.constant_genes or report.genes_with_na):
         what = []
         if report.constant_genes:
@@ -249,12 +255,15 @@ def _r_failures(res: dict[str, Any]) -> list[str]:
 
 async def _run(step: str, tool: str, arguments: dict[str, Any], body: str) -> dict[str, Any]:
     script = session.write_step(step, tool, arguments, body)
+    succeeded = False
     try:
         await rbridge.run_script(script, session.dir)
+        out = session.dir / "outputs" / f"{step}-result.json"
+        result = json.loads(out.read_text(encoding="utf-8"))
+        succeeded = True
+        return result
     finally:
-        session.refresh_script()
-    out = session.dir / "outputs" / f"{step}-result.json"
-    return json.loads(out.read_text(encoding="utf-8"))
+        session.finish_step(step, succeeded=succeeded)
 
 
 def _provenance_line(inst: rbridge.Installation, step: str) -> str:

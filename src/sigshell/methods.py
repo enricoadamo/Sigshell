@@ -31,7 +31,7 @@ WEIGHTED = ("weightedSum", "weightedMean")
 
 TRANSFORMERS = {
     "stepFunction": "Replaces each value with -1, 0 or 1 depending on whether it is below, equal to or above a threshold. By default the threshold is each gene's median across samples (options: method, by, thr, y).",
-    "quantile": "Quantile normalisation: makes every sample's distribution identical (options: ties_method). Refused when any gene has missing values, because sigscores then scores the wrong rows.",
+    "quantile": "Quantile normalisation: makes every sample's distribution identical (options: ties_method). Not offered with GSVA-based scores: the transform can make rows constant and sigscores then scores the wrong genes. Also refused when any gene has missing values.",
     "z": "Z-standardisation of each gene across samples: subtract the mean, divide by the standard deviation. Only by='rows' with robust=false is offered: the other settings are wrong in sigscores.",
 }
 

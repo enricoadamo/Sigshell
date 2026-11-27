@@ -469,6 +469,9 @@ function renderTransforms() {
 }
 
 function gsvaBlock() {
+  if ($("#opt-transform").value === "quantile") {
+    return "Not available with quantile normalisation: the transform can make genes constant, causing sigscores to score the wrong genes. Choose No transformation to use these methods.";
+  }
   const c = state.check;
   if (!c) return null;
   if (c.constant_genes.length || c.genes_with_na.length) {
