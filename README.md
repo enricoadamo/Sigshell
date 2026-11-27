@@ -9,6 +9,8 @@ page needs no AI client or account.
 
 Software Engineering project by Enrico Adamo and Marco Riva.
 
+**Video presentation:** [Watch the Sigshell demo on Google Drive](https://drive.google.com/file/d/1hUFc5M0SS9gC6_y2PmTo9pnkLJcxHFCU/view?usp=sharing).
+
 ## Install prerequisites
 
 Sigshell runs on macOS or Linux. Install [Git](https://git-scm.com/downloads/),
@@ -166,7 +168,6 @@ uv run --group dev pytest -q
 
 The R-backed example test runs when the pinned `sigscores` installation is
 available. The [one-page report](report.pdf) explains the engineering choices.
-A short video demonstration will accompany the course submission separately.
 
 ## Licence and citation
 
